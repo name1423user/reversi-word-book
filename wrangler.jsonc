@@ -1,0 +1,20 @@
+{
+  // Deploys the built app (`dist/`, produced by `npm run build`) as a
+  // Cloudflare Workers static-assets project. No Worker script is needed —
+  // this is a client-side SPA (Vite + React), so Wrangler just needs to
+  // know where the built assets live.
+  //
+  // Usage:
+  //   npm run build
+  //   npx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reversi-word-book",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    // Routing is entirely client-side (HashRouter, everything under `/#/...`),
+    // so any request that doesn't match a built file should fall back to
+    // index.html rather than 404.
+    "not_found_handling": "single-page-application"
+  }
+}
