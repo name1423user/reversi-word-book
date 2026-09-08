@@ -198,6 +198,29 @@ function parseCard(raw: unknown, label: string): CardJson {
   }
 }
 
+/**
+ * Pull the JSON out of what a chat AI actually returns.
+ *
+ * Models wrap answers in ```json fences and often add a sentence before them
+ * ("はい、こちらです：") no matter how firmly the prompt says not to, so the
+ * importer accepts that rather than making the user clean it up by hand.
+ */
+export function extractJsonPayload(text: string): string {
+  const trimmed = text.trim()
+  const fenced = trimmed.match(/```[a-zA-Z]*\s*\n?([\s\S]*?)```/)
+  const body = (fenced ? fenced[1] : trimmed).trim()
+
+  // Take the span between the first bracket and its last match. This also
+  // trims trailing remarks ("必要に応じて調整してください") that follow
+  // otherwise-valid JSON, so it runs even when the text already starts with
+  // a bracket.
+  const start = body.search(/[[{]/)
+  if (start === -1) return body
+  const close = body[start] === '[' ? ']' : '}'
+  const end = body.lastIndexOf(close)
+  return end > start ? body.slice(start, end + 1) : body.slice(start)
+}
+
 export interface ParsedImport {
   kind: 'cards' | 'backup'
   /** For 'cards' the single entry has an empty name. */
@@ -207,7 +230,7 @@ export interface ParsedImport {
 
 /** Accepts both supported shapes and reports which one it found. */
 export function parseImportJson(text: string): ParsedImport {
-  const data = JSON.parse(text)
+  const data = JSON.parse(extractJsonPayload(text))
 
   if (Array.isArray(data)) {
     const cards = data.map((raw, i) => parseCard(raw, `${i + 1}件目`))

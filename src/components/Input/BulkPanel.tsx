@@ -11,6 +11,12 @@ import {
   parseImportJson,
   type ExportMode,
 } from '../../lib/exportImport'
+import {
+  AI_PROMPT_STEPS,
+  CARD_STYLE_LABEL,
+  buildAiPrompt,
+  type CardStyle,
+} from '../../lib/aiPrompt'
 import { useConfirm } from '../common/ConfirmProvider'
 import { useToast } from '../common/ToastProvider'
 
@@ -22,9 +28,27 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [skipDuplicates, setSkipDuplicates] = useState(true)
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiCount, setAiCount] = useState(20)
+  const [aiStyle, setAiStyle] = useState<CardStyle>('termToMeaning')
+  const promptRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
-  const { reportError } = useToast()
+  const { reportError, show } = useToast()
+
+  const aiPrompt = buildAiPrompt({ count: aiCount, style: aiStyle })
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(aiPrompt)
+      show('プロンプトをコピーしました。AIに貼り付けて、続けて資料を送ってください。')
+    } catch {
+      // Clipboard access can be blocked (permissions, insecure context);
+      // select the text so the user can copy it by hand instead of failing.
+      promptRef.current?.select()
+      show('自動コピーできませんでした。選択した文字をコピーしてください。', 'error')
+    }
+  }
 
   const doImport = async (mode: 'append' | 'replace') => {
     setError(null)
@@ -173,6 +197,74 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
         >
           書き出す（テキストのみ）
         </button>
+      </div>
+
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold">🤖 AIにカードを作ってもらう</h3>
+          <button onClick={() => setAiOpen((o) => !o)} className="q-btn q-btn-ghost q-btn-sm">
+            {aiOpen ? '閉じる' : '開く'}
+          </button>
+        </div>
+
+        {aiOpen && (
+          <div className="mt-3 flex flex-col gap-3">
+            <ol className="text-xs pl-5 list-decimal" style={{ color: 'var(--text-muted)' }}>
+              {AI_PROMPT_STEPS.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs">
+                <span className="q-label">枚数</span>
+                <select
+                  value={aiCount}
+                  onChange={(e) => setAiCount(Number(e.target.value))}
+                  className="q-field"
+                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8125rem' }}
+                >
+                  {[10, 20, 30, 50].map((n) => (
+                    <option key={n} value={n}>
+                      {n}枚
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5 text-xs">
+                <span className="q-label">形式</span>
+                <select
+                  value={aiStyle}
+                  onChange={(e) => setAiStyle(e.target.value as CardStyle)}
+                  className="q-field"
+                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8125rem' }}
+                >
+                  {Object.entries(CARD_STYLE_LABEL).map(([k, label]) => (
+                    <option key={k} value={k}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button onClick={copyPrompt} className="q-btn q-btn-primary q-btn-sm">
+                プロンプトをコピー
+              </button>
+            </div>
+
+            <textarea
+              ref={promptRef}
+              readOnly
+              value={aiPrompt}
+              rows={10}
+              onFocus={(e) => e.target.select()}
+              className="q-field text-xs resize-y"
+              aria-label="AIに渡すプロンプト"
+            />
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              返ってきたJSONは、``` で囲まれていたり前置きが付いていてもそのまま貼り付けて大丈夫です。
+            </p>
+          </div>
+        )}
       </div>
 
       {open && (

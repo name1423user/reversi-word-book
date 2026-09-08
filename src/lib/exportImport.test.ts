@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { duplicateKey, exportFilename, formatBytes, parseImportJson } from './exportImport'
+import {
+  duplicateKey,
+  exportFilename,
+  extractJsonPayload,
+  formatBytes,
+  parseImportJson,
+} from './exportImport'
 
 describe('parseImportJson', () => {
   it('reads the spec bare-array shape as a single unnamed deck', () => {
@@ -60,6 +66,50 @@ describe('parseImportJson', () => {
 
   it('rejects invalid JSON', () => {
     expect(() => parseImportJson('{oops')).toThrow()
+  })
+})
+
+// AIの返答をそのまま貼れることを保証する
+describe('extractJsonPayload', () => {
+  it('strips a ```json code fence', () => {
+    const text = '```json\n[{"front":"a","back":"b"}]\n```'
+    expect(JSON.parse(extractJsonPayload(text))).toEqual([{ front: 'a', back: 'b' }])
+  })
+
+  it('strips a bare ``` fence', () => {
+    expect(extractJsonPayload('```\n[1,2]\n```')).toBe('[1,2]')
+  })
+
+  it('drops a sentence the model added before the JSON', () => {
+    const text = 'はい、こちらが20枚のカードです：\n[{"front":"a","back":"b"}]'
+    expect(JSON.parse(extractJsonPayload(text))).toEqual([{ front: 'a', back: 'b' }])
+  })
+
+  it('drops commentary after the JSON too', () => {
+    const text = '[{"front":"a","back":"b"}]\n\n必要に応じて調整してください。'
+    expect(JSON.parse(extractJsonPayload(text))).toEqual([{ front: 'a', back: 'b' }])
+  })
+
+  it('leaves clean JSON untouched', () => {
+    expect(extractJsonPayload('  [1,2]  ')).toBe('[1,2]')
+  })
+
+  it('passes malformed input through so the parse error is still reported', () => {
+    expect(() => JSON.parse(extractJsonPayload('{oops'))).toThrow()
+  })
+})
+
+describe('parseImportJson (AIの返答をそのまま)', () => {
+  it('accepts a fenced answer with a preamble', () => {
+    const answer = [
+      'もちろんです！以下のJSONをご利用ください。',
+      '```json',
+      '[{"front":"ubiquitous","frontImage":null,"back":"どこにでもある","backImage":null}]',
+      '```',
+    ].join('\n')
+    const parsed = parseImportJson(answer)
+    expect(parsed.totalCards).toBe(1)
+    expect(parsed.decks[0].cards[0].back).toBe('どこにでもある')
   })
 })
 
