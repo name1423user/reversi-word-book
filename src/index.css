@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eceef2;
+  --border: #dcdfe4;
+  --text: #14171f;
+  --text-muted: #676d7a;
+  --accent: #4f46e5;
+  --accent-contrast: #ffffff;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --shadow: 0 1px 2px rgba(15, 17, 21, 0.06), 0 4px 12px rgba(15, 17, 21, 0.06);
+  --overlay: rgba(15, 17, 21, 0.5);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-2: #23262e;
+    --border: #32363f;
+    --text: #eef0f4;
+    --text-muted: #9aa1ad;
+    --accent: #818cf8;
+    --accent-contrast: #0f1115;
+    --danger: #f87171;
+    --danger-bg: #3f1d1d;
+    --success: #4ade80;
+    --success-bg: #123822;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.35);
+    --overlay: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface-2: #23262e;
+  --border: #32363f;
+  --text: #eef0f4;
+  --text-muted: #9aa1ad;
+  --accent: #818cf8;
+  --accent-contrast: #0f1115;
+  --danger: #f87171;
+  --danger-bg: #3f1d1d;
+  --success: #4ade80;
+  --success-bg: #123822;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.35);
+  --overlay: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Hiragino Kaku Gothic ProN',
+    'Noto Sans JP',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* Scrollbars: keep subtle in both themes without fighting Tailwind resets */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
