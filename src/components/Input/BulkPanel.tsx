@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { db } from '../../db'
 import { deleteImageRefs } from '../../lib/imageStore'
 import {
@@ -7,6 +7,7 @@ import {
   duplicateKey,
   exportDeck,
   exportFilename,
+  extractJsonPayload,
   formatBytes,
   parseImportJson,
   type ExportMode,
@@ -37,6 +38,27 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
   const { reportError, show } = useToast()
 
   const aiPrompt = buildAiPrompt({ count: aiCount, style: aiStyle })
+
+  // Live feedback on the pasted/typed JSON, so mistakes surface before a
+  // button is clicked rather than after.
+  const preview = useMemo(() => {
+    if (!text.trim()) return null
+    try {
+      const parsed = parseImportJson(text)
+      if (parsed.kind === 'backup') {
+        return {
+          ok: false,
+          message:
+            'これは全デッキのバックアップです。デッキ一覧の「読み込む」から復元してください。',
+        }
+      }
+      const count = parsed.decks[0].cards.length
+      if (count === 0) return { ok: false, message: 'カードが1件もありません' }
+      return { ok: true, message: `${count}件のカードを検出しました` }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : '解析に失敗しました' }
+    }
+  }, [text])
 
   const copyPrompt = async () => {
     try {
@@ -147,15 +169,21 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
     }
   }
 
-  const doExport = async (mode: ExportMode) => {
+  const doExport = async (mode: ExportMode, via: 'download' | 'copy' = 'download') => {
     setError(null)
     setWarning(null)
     setNotice(null)
     setBusy(true)
     try {
       const report = await exportDeck(deckId, { mode, fetchExternal: mode === 'backup' })
-      downloadJson(report.json, exportFilename(deckName, mode === 'backup' ? 'backup' : 'text'))
-      const parts = [`${report.cardCount}枚を書き出しました（${formatBytes(report.byteSize)}）`]
+      const parts: string[] = []
+      if (via === 'copy') {
+        await navigator.clipboard.writeText(report.json)
+        parts.push(`${report.cardCount}枚をコピーしました（${formatBytes(report.byteSize)}）`)
+      } else {
+        downloadJson(report.json, exportFilename(deckName, mode === 'backup' ? 'backup' : 'text'))
+        parts.push(`${report.cardCount}枚を書き出しました（${formatBytes(report.byteSize)}）`)
+      }
       if (report.externalNotFetched > 0) {
         parts.push(
           `外部URLの画像${report.externalNotFetched}件は取り込めずリンクのまま残しました`,
@@ -163,7 +191,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
       }
       setNotice(parts.join(' / '))
     } catch (e) {
-      reportError(e, 'カードの書き出し')
+      reportError(e, via === 'copy' ? 'カードのコピー' : 'カードの書き出し')
     } finally {
       setBusy(false)
     }
@@ -179,24 +207,40 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
           {open ? '閉じる' : '開く'}
         </button>
       </div>
+      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+        このデッキの問題をJSONとして書き出したり、JSONから一括で登録したりできます。
+      </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => doExport('backup')}
-          disabled={busy}
-          className="q-btn q-btn-outline q-btn-sm"
-          title="画像をWebPとして埋め込み、外部URLの画像も可能な範囲で取り込みます"
-        >
-          書き出す（画像込み）
-        </button>
-        <button
-          onClick={() => doExport('text')}
-          disabled={busy}
-          className="q-btn q-btn-ghost q-btn-sm"
-          title="画像を含まない軽量なJSON（外部URLのリンクは残ります）"
-        >
-          書き出す（テキストのみ）
-        </button>
+      <div className="mt-3">
+        <h3 className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>
+          📤 書き出し
+        </h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => doExport('backup')}
+            disabled={busy}
+            className="q-btn q-btn-outline q-btn-sm"
+            title="画像をWebPとして埋め込み、外部URLの画像も可能な範囲で取り込みます"
+          >
+            書き出す（画像込み）
+          </button>
+          <button
+            onClick={() => doExport('text')}
+            disabled={busy}
+            className="q-btn q-btn-ghost q-btn-sm"
+            title="画像を含まない軽量なJSON（外部URLのリンクは残ります）"
+          >
+            書き出す（テキストのみ）
+          </button>
+          <button
+            onClick={() => doExport('text', 'copy')}
+            disabled={busy}
+            className="q-btn q-btn-ghost q-btn-sm"
+            title="画像を含まない軽量なJSONをクリップボードにコピーします"
+          >
+            📋 コピー
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
@@ -268,7 +312,8 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
       </div>
 
       {open && (
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-4 pt-4 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-extrabold">📥 読み込み（JSON一括登録）</h3>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {'[{"front":"...","frontImage":null,"back":"...","backImage":null}, ...]'} 形式のJSONを貼り付けるか、ファイルを読み込んでください。
           </p>
@@ -279,6 +324,37 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
             rows={6}
             className="q-field font-mono text-xs resize-y"
           />
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            {preview ? (
+              <p
+                className="text-xs"
+                style={{ color: preview.ok ? 'var(--accent-strong)' : 'var(--danger)' }}
+              >
+                {preview.ok ? '✓' : '⚠'} {preview.message}
+              </p>
+            ) : (
+              <span />
+            )}
+            {text.trim() && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      setText(JSON.stringify(JSON.parse(extractJsonPayload(text)), null, 2))
+                    } catch {
+                      // Not valid JSON yet — leave the text as the user typed it.
+                    }
+                  }}
+                  className="q-btn q-btn-ghost q-btn-sm"
+                >
+                  整形
+                </button>
+                <button onClick={() => setText('')} className="q-btn q-btn-ghost q-btn-sm">
+                  クリア
+                </button>
+              </div>
+            )}
+          </div>
           <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             <input
               type="checkbox"
@@ -307,14 +383,14 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
             />
             <button
               onClick={() => doImport('append')}
-              disabled={busy}
+              disabled={busy || !preview?.ok}
               className="q-btn q-btn-primary q-btn-sm"
             >
               {busy ? '処理中…' : '既存に追加'}
             </button>
             <button
               onClick={() => doImport('replace')}
-              disabled={busy}
+              disabled={busy || !preview?.ok}
               className="q-btn q-btn-danger q-btn-sm"
             >
               {busy ? '処理中…' : '既存を置き換え'}
