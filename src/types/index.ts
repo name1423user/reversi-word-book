@@ -79,11 +79,16 @@ export type DeckSortKey = 'manual' | 'createdDesc' | 'nameAsc' | 'countDesc'
 /** Order cards are presented in during a study session. */
 export type StudyOrder = 'sequential' | 'shuffle' | 'difficulty'
 
-/** How a question is presented and answered during a study session.
- * - flip:   turn the card over, self-judge ○/✕ (the original mode)
- * - type:   type an answer, then reveal and self-judge (学習モード)
- * - choice: pick from 4 answer buttons, graded automatically (テストモード) */
-export type PracticeMode = 'flip' | 'type' | 'choice'
+/** Which cards get quizzed, and how many.
+ * - flip / study: the whole deck (flip is the original mode; study is 学習モード)
+ * - test:         a random subset, sized by the user (テストモード) */
+export type SessionMode = 'flip' | 'study' | 'test'
+
+/** How a question is answered, for 学習モード/テストモード (flip mode always
+ * flips a card and self-judges, so this doesn't apply there).
+ * - type:   type an answer, then reveal and self-judge
+ * - choice: pick from up to 4 answer buttons, graded automatically */
+export type AnswerFormat = 'type' | 'choice'
 
 export type Judgment = 'correct' | 'incorrect'
 

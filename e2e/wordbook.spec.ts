@@ -111,6 +111,7 @@ test('学習モード（入力して確認）で自己採点できる', async ({
 
   await page.getByRole('link', { name: '学習へ' }).click()
   await page.getByRole('button', { name: '学習モード' }).click()
+  await page.getByRole('button', { name: '入力' }).click()
   await page.getByRole('button', { name: '順番どおり' }).click()
   await page.getByRole('button', { name: '学習をはじめる' }).click()
 
@@ -131,6 +132,11 @@ test('学習モード（入力して確認）で自己採点できる', async ({
 })
 
 test('テストモード（4択）で自動採点される', async ({ page }) => {
+  const answers: Record<string, string> = {
+    apple: 'りんご',
+    banana: 'バナナ',
+    cherry: 'さくらんぼ',
+  }
   await createDeck(page, '英単語')
   await gotoDeckInput(page, '英単語')
   await importCards(page, [
@@ -141,18 +147,47 @@ test('テストモード（4択）で自動採点される', async ({ page }) =>
 
   await page.getByRole('link', { name: '学習へ' }).click()
   await page.getByRole('button', { name: 'テストモード' }).click()
-  await page.getByRole('button', { name: '順番どおり' }).click()
+  await page.getByRole('button', { name: '選択肢' }).click()
+  await expect(page.getByText('3問', { exact: true })).toBeVisible() // 問題数 clamps to the deck size (3 cards)
   await page.getByRole('button', { name: '学習をはじめる' }).click()
 
-  // Sequential order makes the correct answer for each card predictable.
-  for (const answer of ['りんご', 'バナナ', 'さくらんぼ']) {
-    await page.getByRole('button', { name: answer, exact: true }).click()
+  // テストモード draws a random subset in random order, so figure out the
+  // right answer per question from whichever front text is showing.
+  for (let i = 0; i < 3; i++) {
+    let clicked = false
+    for (const [front, back] of Object.entries(answers)) {
+      if (await page.getByText(front, { exact: true }).isVisible()) {
+        await page.getByRole('button', { name: back, exact: true }).click()
+        clicked = true
+        break
+      }
+    }
+    expect(clicked).toBe(true)
     await page.waitForTimeout(800)
   }
 
   await expect(page.getByRole('heading', { name: /お疲れさまでした/ })).toBeVisible()
   await expect(page.getByText('正解率')).toBeVisible()
   await expect(page.getByText('100%')).toBeVisible()
+})
+
+test('テストモードで問題数を指定できる', async ({ page }) => {
+  await createDeck(page, '英単語')
+  await gotoDeckInput(page, '英単語')
+  await importCards(page, [
+    { front: 'apple', back: 'りんご' },
+    { front: 'banana', back: 'バナナ' },
+    { front: 'cherry', back: 'さくらんぼ' },
+  ])
+
+  await page.getByRole('link', { name: '学習へ' }).click()
+  await page.getByRole('button', { name: 'テストモード' }).click()
+  await page.getByLabel('問題数').fill('2')
+  await expect(page.getByText('2問')).toBeVisible()
+  await page.getByRole('button', { name: '学習をはじめる' }).click()
+
+  await expect(page.getByText('1', { exact: true })).toBeVisible()
+  await expect(page.getByText('/ 2')).toBeVisible()
 })
 
 test('全デッキのバックアップを書き出して読み込める', async ({ page }) => {

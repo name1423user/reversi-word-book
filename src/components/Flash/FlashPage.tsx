@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../../db'
-import type { Card, PracticeMode, SessionResult, StudyOrder } from '../../types'
+import type { AnswerFormat, Card, SessionMode, SessionResult, StudyOrder } from '../../types'
 import { shuffled } from '../../lib/shuffle'
 import { byDifficulty } from '../../lib/difficulty'
 import { choiceModeAvailable } from '../../lib/choices'
@@ -17,7 +17,10 @@ import type { RoundJudgment, RoundResult } from './flashTypes'
 
 const GUIDE_KEY = 'wordbook:seenFlashGuide'
 const ORDER_KEY = 'wordbook:studyOrder'
-const MODE_KEY = 'wordbook:studyMode'
+const MODE_KEY = 'wordbook:sessionMode'
+const FORMAT_KEY = 'wordbook:answerFormat'
+const TEST_COUNT_KEY = 'wordbook:testCount'
+const DEFAULT_TEST_COUNT = 10
 
 type Phase = 'setup' | 'playing' | 'summary'
 
@@ -27,10 +30,16 @@ const ORDER_OPTIONS: { value: StudyOrder; label: string; hint: string }[] = [
   { value: 'difficulty', label: '苦手優先', hint: '間違えたカードから出題' },
 ]
 
-const MODE_OPTIONS: { value: PracticeMode; label: string; hint: string }[] = [
+const MODE_OPTIONS: { value: SessionMode; label: string; hint: string }[] = [
   { value: 'flip', label: 'めくって確認', hint: 'カードをめくって自己採点' },
-  { value: 'type', label: '学習モード', hint: '答えを入力してから確認' },
-  { value: 'choice', label: 'テストモード', hint: '4択から選んで自動採点' },
+  { value: 'study', label: '学習モード', hint: 'すべてのカードを出題' },
+  { value: 'test', label: 'テストモード', hint: '好きな問題数をランダム出題' },
+]
+
+/** 学習モード・テストモードいずれでも選べる回答方式。 */
+const FORMAT_OPTIONS: { value: AnswerFormat; label: string; hint: string }[] = [
+  { value: 'type', label: '入力', hint: '答えを入力して確認' },
+  { value: 'choice', label: '選択肢', hint: '4択から選ぶ' },
 ]
 
 function orderedByCreation(cards: Card[]): Card[] {
@@ -54,9 +63,23 @@ function loadStudyOrder(): StudyOrder {
     : 'shuffle'
 }
 
-function loadPracticeMode(): PracticeMode {
+function loadSessionMode(): SessionMode {
   const saved = localStorage.getItem(MODE_KEY)
-  return saved === 'flip' || saved === 'type' || saved === 'choice' ? saved : 'flip'
+  return saved === 'flip' || saved === 'study' || saved === 'test' ? saved : 'flip'
+}
+
+function loadAnswerFormat(): AnswerFormat {
+  const saved = localStorage.getItem(FORMAT_KEY)
+  return saved === 'type' || saved === 'choice' ? saved : 'type'
+}
+
+function loadTestCount(): number {
+  const saved = Number(localStorage.getItem(TEST_COUNT_KEY))
+  return Number.isFinite(saved) && saved > 0 ? Math.floor(saved) : DEFAULT_TEST_COUNT
+}
+
+function clampTestCount(count: number, deckSize: number): number {
+  return Math.min(Math.max(1, Math.floor(count) || 1), Math.max(1, deckSize))
 }
 
 export function FlashPage() {
@@ -74,7 +97,9 @@ export function FlashPage() {
 
   const { reportError, show } = useToast()
   const [studyOrder, setStudyOrder] = useState<StudyOrder>(loadStudyOrder)
-  const [mode, setMode] = useState<PracticeMode>(loadPracticeMode)
+  const [sessionMode, setSessionMode] = useState<SessionMode>(loadSessionMode)
+  const [answerFormat, setAnswerFormat] = useState<AnswerFormat>(loadAnswerFormat)
+  const [testCount, setTestCount] = useState<number>(loadTestCount)
   const [phase, setPhase] = useState<Phase>('setup')
   const [queue, setQueue] = useState<Card[]>([])
   const [index, setIndex] = useState(0)
@@ -96,11 +121,21 @@ export function FlashPage() {
     return [...sessionsForDeck].sort((a, b) => b.finishedAt - a.finishedAt)[0]
   }, [sessionsForDeck])
 
-  // テストモード（4択）needs at least two distinct answers in the deck to
-  // build a real question. Fall back to めくって確認 rather than starting a
-  // mode that can't actually ask anything.
+  // 選択肢（4択）needs at least two distinct answers in the deck to build a
+  // real question. Fall back to 入力 rather than offering a format that
+  // can't actually ask anything.
   const choiceAvailable = useMemo(() => choiceModeAvailable(cards ?? []), [cards])
-  const activeMode: PracticeMode = mode === 'choice' && !choiceAvailable ? 'flip' : mode
+  const activeFormat: AnswerFormat = answerFormat === 'choice' && !choiceAvailable ? 'type' : answerFormat
+  const deckSize = cards?.length ?? 0
+  const effectiveTestCount = clampTestCount(testCount, deckSize)
+
+  /** 学習モード/めくって確認 quiz the whole deck in the chosen order;
+   * テストモード draws a random subset sized by the user instead. */
+  const buildQueue = (): Card[] => {
+    if (!cards || cards.length === 0) return []
+    if (sessionMode === 'test') return shuffled(cards).slice(0, clampTestCount(testCount, cards.length))
+    return applyOrder(cards, studyOrder)
+  }
 
   const beginRound = (roundCards: Card[], nextRoundNumber: number, extraTotal: number) => {
     roundJudgmentsRef.current = []
@@ -116,15 +151,15 @@ export function FlashPage() {
   }
 
   const startSession = () => {
-    if (!cards || cards.length === 0) return
-    const q = applyOrder(cards, studyOrder)
+    const q = buildQueue()
+    if (q.length === 0) return
     setOverallCompleted(0)
     setOverallTotal(0)
     setFrozenBaseline(latestPrimarySession)
     beginRound(q, 1, q.length)
     // The guide only covers めくって確認's swipe/tap gestures, so it's
     // irrelevant (and shouldn't get marked "seen") in the other modes.
-    if (activeMode === 'flip' && !localStorage.getItem(GUIDE_KEY)) {
+    if (sessionMode === 'flip' && !localStorage.getItem(GUIDE_KEY)) {
       setShowGuide(true)
       localStorage.setItem(GUIDE_KEY, '1')
     }
@@ -271,11 +306,13 @@ export function FlashPage() {
   }
 
   const restartAll = () => {
-    if (!cards || cards.length === 0) {
+    // テストモード re-rolls a fresh random subset, same as a first start —
+    // reusing the just-finished round's cards would defeat "test again".
+    const q = buildQueue()
+    if (q.length === 0) {
       setPhase('setup')
       return
     }
-    const q = applyOrder(cards, studyOrder)
     setOverallCompleted(0)
     setOverallTotal(0)
     setFrozenBaseline(latestPrimarySession)
@@ -290,7 +327,7 @@ export function FlashPage() {
     // Arrow/space judging is めくって確認-only: 学習モード has a text input
     // to type into, and テストモード is judged by clicking an option, so
     // hijacking arrow keys there would fight the user rather than help.
-    if (phase !== 'playing' || activeMode !== 'flip') return
+    if (phase !== 'playing' || sessionMode !== 'flip') return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') {
         e.preventDefault()
@@ -306,7 +343,7 @@ export function FlashPage() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, activeMode, queue, index])
+  }, [phase, sessionMode, queue, index])
 
   if (!deckId) return null
 
@@ -322,7 +359,7 @@ export function FlashPage() {
         <Link to={`/decks/${deckId}/input`} className="q-btn q-btn-outline q-btn-sm ml-auto">
           入力へ
         </Link>
-        {phase === 'playing' && activeMode === 'flip' && (
+        {phase === 'playing' && sessionMode === 'flip' && (
           <button
             onClick={() => setShowGuide(true)}
             className="q-btn q-btn-ghost"
@@ -352,57 +389,136 @@ export function FlashPage() {
           ) : (
             <>
               <div className="text-center">
-                <p className="text-3xl font-extrabold">{cards?.length ?? 0}枚</p>
+                <p className="text-3xl font-extrabold">
+                  {sessionMode === 'test' ? effectiveTestCount : (cards?.length ?? 0)}問
+                </p>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  のカードを学習します
+                  {sessionMode === 'test'
+                    ? `全${deckSize}枚からランダムに出題します`
+                    : 'のカードを学習します'}
                 </p>
               </div>
               <fieldset className="w-full max-w-md">
                 <legend className="q-label mb-2 w-full text-center">モード</legend>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {MODE_OPTIONS.map((opt) => {
-                    const active = mode === opt.value
-                    const disabled = opt.value === 'choice' && !choiceAvailable
+                    const active = sessionMode === opt.value
                     return (
                       <button
                         key={opt.value}
                         onClick={() => {
-                          setMode(opt.value)
+                          setSessionMode(opt.value)
                           localStorage.setItem(MODE_KEY, opt.value)
                         }}
-                        disabled={disabled}
                         aria-pressed={active}
                         className="q-tile px-3 py-3 text-center"
                         style={
-                          disabled
-                            ? { opacity: 0.5, cursor: 'not-allowed' }
-                            : active
-                              ? {
-                                  borderColor: 'var(--accent)',
-                                  background: 'var(--accent-soft)',
-                                  boxShadow: 'none',
-                                }
-                              : undefined
+                          active
+                            ? {
+                                borderColor: 'var(--accent)',
+                                background: 'var(--accent-soft)',
+                                boxShadow: 'none',
+                              }
+                            : undefined
                         }
                       >
                         <span
                           className="block text-sm font-bold"
-                          style={{ color: !disabled && active ? 'var(--accent)' : 'var(--text)' }}
+                          style={{ color: active ? 'var(--accent)' : 'var(--text)' }}
                         >
                           {opt.label}
                         </span>
                         <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {disabled ? '答えの種類が2つ以上必要です' : opt.hint}
+                          {opt.hint}
                         </span>
                       </button>
                     )
                   })}
                 </div>
               </fieldset>
-              <fieldset className="w-full max-w-md">
-                <legend className="q-label mb-2 w-full text-center">出題順</legend>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {ORDER_OPTIONS.map((opt) => {
+
+              {sessionMode !== 'flip' && (
+                <fieldset className="w-full max-w-md">
+                  <legend className="q-label mb-2 w-full text-center">回答方式</legend>
+                  <div className="grid gap-2 grid-cols-2">
+                    {FORMAT_OPTIONS.map((opt) => {
+                      const active = answerFormat === opt.value
+                      const disabled = opt.value === 'choice' && !choiceAvailable
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            setAnswerFormat(opt.value)
+                            localStorage.setItem(FORMAT_KEY, opt.value)
+                          }}
+                          disabled={disabled}
+                          aria-pressed={active}
+                          className="q-tile px-3 py-3 text-center"
+                          style={
+                            disabled
+                              ? { opacity: 0.5, cursor: 'not-allowed' }
+                              : active
+                                ? {
+                                    borderColor: 'var(--accent)',
+                                    background: 'var(--accent-soft)',
+                                    boxShadow: 'none',
+                                  }
+                                : undefined
+                          }
+                        >
+                          <span
+                            className="block text-sm font-bold"
+                            style={{ color: !disabled && active ? 'var(--accent)' : 'var(--text)' }}
+                          >
+                            {opt.label}
+                          </span>
+                          <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {disabled ? '答えの種類が2つ以上必要です' : opt.hint}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+              )}
+
+              {sessionMode === 'test' ? (
+                <fieldset className="w-full max-w-md">
+                  <legend className="q-label mb-2 w-full text-center">問題数</legend>
+                  <div className="flex items-center justify-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={deckSize}
+                      value={testCount}
+                      onChange={(e) => {
+                        const n = Number(e.target.value)
+                        setTestCount(n)
+                        localStorage.setItem(TEST_COUNT_KEY, String(n))
+                      }}
+                      className="q-field text-center"
+                      style={{ width: '6rem' }}
+                      aria-label="問題数"
+                    />
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      問（最大{deckSize}問）
+                    </span>
+                    <button
+                      onClick={() => {
+                        setTestCount(deckSize)
+                        localStorage.setItem(TEST_COUNT_KEY, String(deckSize))
+                      }}
+                      className="q-btn q-btn-ghost q-btn-sm"
+                    >
+                      全部
+                    </button>
+                  </div>
+                </fieldset>
+              ) : (
+                <fieldset className="w-full max-w-md">
+                  <legend className="q-label mb-2 w-full text-center">出題順</legend>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {ORDER_OPTIONS.map((opt) => {
                     const active = studyOrder === opt.value
                     return (
                       <button
@@ -435,8 +551,9 @@ export function FlashPage() {
                       </button>
                     )
                   })}
-                </div>
-              </fieldset>
+                  </div>
+                </fieldset>
+              )}
               <button onClick={startSession} className="q-btn q-btn-primary px-8 py-3 text-base">
                 学習をはじめる
               </button>
@@ -467,7 +584,7 @@ export function FlashPage() {
           </div>
 
           <div className="flex-1 flex items-center justify-center">
-            {activeMode === 'flip' && (
+            {sessionMode === 'flip' && (
               <FlashCard
                 key={currentCard.id}
                 card={currentCard}
@@ -476,10 +593,10 @@ export function FlashPage() {
                 onJudge={handleJudge}
               />
             )}
-            {activeMode === 'type' && (
+            {sessionMode !== 'flip' && activeFormat === 'type' && (
               <TypeCard key={currentCard.id} card={currentCard} onJudge={handleJudge} />
             )}
-            {activeMode === 'choice' && (
+            {sessionMode !== 'flip' && activeFormat === 'choice' && (
               <ChoiceCard
                 key={currentCard.id}
                 card={currentCard}
@@ -493,7 +610,7 @@ export function FlashPage() {
               学習モード/テストモード judge from inside their own card
               (typed self-check / choice click), so this bar is めくって
               確認-only. */}
-          {activeMode === 'flip' && (
+          {sessionMode === 'flip' && (
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => handleJudge(false)}
