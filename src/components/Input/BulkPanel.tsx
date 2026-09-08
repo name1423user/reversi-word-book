@@ -20,12 +20,26 @@ import {
 import { useConfirm } from '../common/ConfirmProvider'
 import { useToast } from '../common/ToastProvider'
 
-export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: string }) {
+export function BulkPanel({
+  deckId,
+  deckName,
+  onBusyChange,
+}: {
+  deckId: string
+  deckName: string
+  /** Lets the input page hold the ordinary add-card form while an import is
+   * processing, so the two never touch the same deck at once. */
+  onBusyChange?: (busy: boolean) => void
+}) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusyState] = useState(false)
+  const setBusy = (value: boolean) => {
+    setBusyState(value)
+    onBusyChange?.(value)
+  }
   const [open, setOpen] = useState(false)
   const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [aiOpen, setAiOpen] = useState(false)
@@ -75,13 +89,24 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
       return
     }
 
+    // Read the deck's current cards once, up front — used for duplicate
+    // detection (append) and, for "replace", pinned right here as the exact
+    // and only set that will ever be deleted. Deciding this *before* the
+    // confirm dialog even shows (and long before buildCards's per-image
+    // processing, which is what actually takes real wall-clock time) means
+    // a card added through the ordinary add-card form while the import is
+    // still running can never be swept up by it.
+    const existing =
+      mode === 'replace' || skipDuplicates
+        ? await db.cards.where('deckId').equals(deckId).toArray()
+        : []
+
     // Duplicate detection against existing cards (append only — a replace
     // wipes them anyway) and within the file itself.
     let skipped = 0
     if (skipDuplicates) {
       const seen = new Set<string>()
       if (mode === 'append') {
-        const existing = await db.cards.where('deckId').equals(deckId).toArray()
         for (const c of existing) seen.add(duplicateKey(c.front))
       }
       const deduped = incoming.filter((c) => {
@@ -102,9 +127,23 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
     const confirmMessage =
       skipped > 0 ? `表のテキストが重複する${skipped}件はスキップされます。` : undefined
     if (mode === 'replace') {
+      const preview = existing
+        .slice(0, 3)
+        .map((c) => c.front.trim() || '(画像のみ)')
+        .join('、')
+      const previewLine =
+        existing.length > 0
+          ? `削除されるカードの例: ${preview}${existing.length > 3 ? ` 他${existing.length - 3}件` : ''}`
+          : undefined
       const ok = await confirm({
         title: '既存のカードを置き換えますか？',
-        message: `このデッキの既存カードをすべて削除し、${incoming.length}件で置き換えます。この操作は取り消せません。${confirmMessage ? `\n${confirmMessage}` : ''}`,
+        message: [
+          `このデッキの既存カード${existing.length}件をすべて削除し、${incoming.length}件で置き換えます。この操作は取り消せません。`,
+          previewLine,
+          confirmMessage,
+        ]
+          .filter(Boolean)
+          .join('\n'),
         confirmLabel: '置き換える',
         danger: true,
       })
@@ -120,15 +159,6 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
 
     setBusy(true)
     try {
-      // Pin exactly which cards "replace" is allowed to remove *before*
-      // buildCards runs. buildCards processes images sequentially and can
-      // take real wall-clock time, during which the ordinary add-card form
-      // on the same page stays fully usable. Deleting by this fixed id list
-      // — instead of re-querying `deckId` when the transaction finally runs
-      // — means a card added while the import was still processing can
-      // never be swept up by it.
-      const existing =
-        mode === 'replace' ? await db.cards.where('deckId').equals(deckId).toArray() : []
       const { cards: newCards, warnings } = await buildCards(deckId, incoming)
 
       if (mode === 'replace') {

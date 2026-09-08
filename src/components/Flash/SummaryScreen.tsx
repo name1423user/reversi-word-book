@@ -1,5 +1,5 @@
 import type { SessionResult } from '../../types'
-import { formatDuration } from '../../lib/date'
+import { formatDuration, formatSessionWhen } from '../../lib/date'
 import { useConfirm } from '../common/ConfirmProvider'
 import { SmartImage } from '../common/SmartImage'
 import type { RoundResult } from './flashTypes'
@@ -47,7 +47,7 @@ export function SummaryScreen({
         <Stat label="所要時間" value={formatDuration(result.durationMs)} />
       </div>
 
-      {prevAccuracy !== null && delta !== null && (
+      {previous && prevAccuracy !== null && delta !== null && (
         <div
           className="q-card p-3 mb-4 text-sm text-center"
         >
@@ -56,7 +56,9 @@ export function SummaryScreen({
             {delta > 0 ? '+' : ''}
             {delta}pt
           </b>{' '}
-          <span style={{ color: 'var(--text-muted)' }}>（前回 {prevAccuracy}%）</span>
+          <span style={{ color: 'var(--text-muted)' }}>
+            （前回 {formatSessionWhen(previous.finishedAt)} {prevAccuracy}%）
+          </span>
         </div>
       )}
 

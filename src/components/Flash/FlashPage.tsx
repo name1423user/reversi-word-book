@@ -463,8 +463,9 @@ export function FlashPage() {
               onClick={handleUndo}
               disabled={!canUndo || isFinishing}
               className="q-btn q-btn-ghost q-btn-sm"
+              title={isFinishing ? '記録を保存しています…' : undefined}
             >
-              ↺ 元に戻す
+              {isFinishing ? '記録中…' : '↺ 元に戻す'}
             </button>
           </div>
         </div>
