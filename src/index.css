@@ -119,6 +119,13 @@ body {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
+  /* Push all content down clear of the iPhone's status bar / Dynamic
+   * Island. viewport-fit=cover (see index.html) lets the page draw under
+   * that area, so without this the top of every screen sits right behind
+   * OS chrome. env(safe-area-inset-top) accounts for the device itself;
+   * the extra 1cm on top is a deliberate visual buffer so content doesn't
+   * feel cramped against it. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1cm);
 }
 
 button {
