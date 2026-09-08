@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               role={toast.tone === 'error' ? 'alert' : 'status'}
-              className="w-full max-w-md rounded-lg px-4 py-3 text-sm pointer-events-auto"
+              className="w-full max-w-md rounded-xl px-4 py-3 text-sm font-medium pointer-events-auto"
               style={{
                 background: toast.tone === 'error' ? 'var(--danger-bg)' : 'var(--surface)',
                 color: toast.tone === 'error' ? 'var(--danger)' : 'var(--text)',

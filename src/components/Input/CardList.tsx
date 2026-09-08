@@ -150,14 +150,13 @@ export function CardList({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="表・裏のテキストで検索"
-          className="flex-1 rounded-lg px-3 py-2 text-sm border"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          className="q-field flex-1"
         />
         <select
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="rounded-lg px-2 py-2 text-sm border"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          className="q-field"
+          style={{ width: 'auto' }}
         >
           {Object.entries(SORT_LABEL).map(([k, label]) => (
             <option key={k} value={k}>
@@ -177,7 +176,7 @@ export function CardList({
               onClick={() =>
                 setChecked(allVisibleChecked ? new Set() : new Set(filtered.map((c) => c.id)))
               }
-              className="text-xs"
+              className="q-btn q-btn-ghost q-btn-sm"
               style={{ color: 'var(--accent)' }}
             >
               {allVisibleChecked ? '全解除' : '全選択'}
@@ -185,20 +184,18 @@ export function CardList({
             <button
               onClick={deleteChecked}
               disabled={checked.size === 0}
-              className="rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-40"
-              style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}
+              className="q-btn q-btn-danger q-btn-sm"
             >
               {checked.size}枚を削除
             </button>
-            <button onClick={exitSelectMode} className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <button onClick={exitSelectMode} className="q-btn q-btn-ghost q-btn-sm">
               やめる
             </button>
           </div>
         ) : (
           <button
             onClick={() => setSelectMode(true)}
-            className="text-xs"
-            style={{ color: 'var(--text-muted)' }}
+            className="q-btn q-btn-ghost q-btn-sm"
           >
             選択して削除
           </button>
@@ -211,11 +208,12 @@ export function CardList({
           return (
             <li
               key={card.id}
-              className="rounded-lg p-2.5 flex gap-2 cursor-pointer border"
-              style={{
-                background: selectedId === card.id ? 'var(--surface-2)' : 'var(--surface)',
-                borderColor: selectedId === card.id ? 'var(--accent)' : 'var(--border)',
-              }}
+              className="q-card p-3 flex gap-3 cursor-pointer"
+              style={
+                selectedId === card.id
+                  ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' }
+                  : undefined
+              }
               onClick={() => (selectMode ? toggleChecked(card.id) : onSelect(card))}
             >
               {selectMode && (
@@ -229,9 +227,13 @@ export function CardList({
                 />
               )}
               <div className="flex-1 min-w-0">
-                <div className="grid grid-cols-2 gap-2">
-                  <CardFace text={card.front} image={card.frontImage} label="表" />
-                  <CardFace text={card.back} image={card.backImage} label="裏" />
+                <div className="grid grid-cols-2">
+                  <div className="pr-3">
+                    <CardFace text={card.front} image={card.frontImage} label="表" />
+                  </div>
+                  <div className="pl-3" style={{ borderLeft: '1px solid var(--border)' }}>
+                    <CardFace text={card.back} image={card.backImage} label="裏" />
+                  </div>
                 </div>
                 {stats.attempts > 0 && (
                   <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -247,24 +249,24 @@ export function CardList({
                       e.stopPropagation()
                       duplicateCard(card)
                     }}
-                    className="text-xs px-1.5 py-1 rounded"
-                    style={{ color: 'var(--text-muted)' }}
+                    className="q-btn q-btn-ghost q-btn-sm"
+                    style={{ padding: '0.25rem 0.4rem' }}
                     aria-label="カードを複製"
                     title="複製"
                   >
-                    ⧉
+                    <CopyIcon />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       deleteCard(card)
                     }}
-                    className="text-xs px-1.5 py-1 rounded"
-                    style={{ color: 'var(--danger)' }}
+                    className="q-btn q-btn-ghost q-btn-sm"
+                    style={{ padding: '0.25rem 0.4rem', color: 'var(--danger)' }}
                     aria-label="カードを削除"
                     title="削除"
                   >
-                    🗑
+                    <TrashIcon />
                   </button>
                 </div>
               )}
@@ -284,13 +286,31 @@ export function CardList({
 function CardFace({ text, image, label }: { text: string; image: string | null; label: string }) {
   return (
     <div className="min-w-0">
-      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </span>
+      <span className="q-label">{label}</span>
       {image && (
-        <SmartImage src={image} alt={label} className="w-full h-14 object-cover rounded mt-0.5" />
+        <SmartImage src={image} alt={label} className="w-full h-16 object-cover rounded mt-1" />
       )}
-      <p className="text-xs truncate mt-0.5">{text || (image ? '' : '(空)')}</p>
+      <p className="text-sm font-medium truncate mt-0.5">{text || (image ? '' : '(空)')}</p>
     </div>
+  )
+}
+
+/* Inline icons: emoji and the ⧉ glyph fall back to tofu in some system fonts,
+   and they can't inherit the button's colour. */
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
   )
 }

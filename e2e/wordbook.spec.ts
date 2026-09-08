@@ -12,7 +12,9 @@ test('デッキを作成・並び替え・削除できる', async ({ page }) => 
   }
 
   const deckNames = () =>
-    page.getByRole('listitem').locator('button.text-base').allTextContents()
+    // Select by the button's title rather than a styling class, so a visual
+    // refactor can't silently break the selector.
+    page.getByRole('listitem').getByTitle('名前を編集').allTextContents()
 
   // Newest deck goes to the top of the manual order.
   expect(await deckNames()).toEqual(['デッキC', 'デッキB', 'デッキA'])

@@ -147,12 +147,11 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
 
   return (
     <div
-      className="rounded-xl p-4"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+      className="q-card p-5"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">JSON一括登録 / エクスポート</h2>
-        <button onClick={() => setOpen((o) => !o)} className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        <h2 className="text-base font-extrabold">JSON一括登録 / エクスポート</h2>
+        <button onClick={() => setOpen((o) => !o)} className="q-btn q-btn-ghost q-btn-sm">
           {open ? '閉じる' : '開く'}
         </button>
       </div>
@@ -161,8 +160,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
         <button
           onClick={() => doExport('backup')}
           disabled={busy}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-          style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+          className="q-btn q-btn-outline q-btn-sm"
           title="画像をWebPとして埋め込み、外部URLの画像も可能な範囲で取り込みます"
         >
           書き出す（画像込み）
@@ -170,8 +168,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
         <button
           onClick={() => doExport('text')}
           disabled={busy}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-          style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+          className="q-btn q-btn-ghost q-btn-sm"
           title="画像を含まない軽量なJSON（外部URLのリンクは残ります）"
         >
           書き出す（テキストのみ）
@@ -188,8 +185,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
             onChange={(e) => setText(e.target.value)}
             placeholder="JSONをここに貼り付け"
             rows={6}
-            className="w-full rounded-lg px-3 py-2 text-xs font-mono border resize-y"
-            style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+            className="q-field font-mono text-xs resize-y"
           />
           <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             <input
@@ -202,8 +198,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => fileRef.current?.click()}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium"
-              style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+              className="q-btn q-btn-outline q-btn-sm"
             >
               ファイルを選択
             </button>
@@ -221,16 +216,14 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
             <button
               onClick={() => doImport('append')}
               disabled={busy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
+              className="q-btn q-btn-primary q-btn-sm"
             >
               {busy ? '処理中…' : '既存に追加'}
             </button>
             <button
               onClick={() => doImport('replace')}
               disabled={busy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}
+              className="q-btn q-btn-danger q-btn-sm"
             >
               {busy ? '処理中…' : '既存を置き換え'}
             </button>

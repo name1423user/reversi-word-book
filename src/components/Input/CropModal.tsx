@@ -34,10 +34,10 @@ export function CropModal({
       style={{ background: 'var(--overlay)' }}
     >
       <div
-        className="w-full max-w-lg rounded-xl p-4 flex flex-col gap-3"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+        className="q-card w-full max-w-lg p-5 flex flex-col gap-3"
+        style={{ boxShadow: 'var(--shadow-lift)' }}
       >
-        <h2 className="text-base font-semibold">画像をトリミング</h2>
+        <h2 className="text-base font-extrabold">画像をトリミング</h2>
         <div className="relative w-full h-72 rounded-lg overflow-hidden" style={{ background: '#000' }}>
           <Cropper
             image={src}
@@ -64,16 +64,14 @@ export function CropModal({
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium"
-            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+            className="q-btn q-btn-ghost"
           >
             キャンセル
           </button>
           <button
             onClick={confirm}
             disabled={busy}
-            className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
+            className="q-btn q-btn-primary"
           >
             {busy ? '処理中…' : 'この範囲で確定'}
           </button>

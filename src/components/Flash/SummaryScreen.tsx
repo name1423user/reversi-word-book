@@ -35,7 +35,10 @@ export function SummaryScreen({
 
   return (
     <div className="mx-auto w-full max-w-lg px-4 py-8 flex-1 overflow-y-auto">
-      <h1 className="text-xl font-bold text-center mb-6">お疲れさまでした 🎉</h1>
+      <h1 className="text-2xl font-extrabold text-center mb-1">お疲れさまでした 🎉</h1>
+      <p className="text-sm text-center mb-6" style={{ color: 'var(--text-muted)' }}>
+        今回の結果です
+      </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Stat label="正解" value={`${result.correct}`} color="var(--success)" />
@@ -46,8 +49,7 @@ export function SummaryScreen({
 
       {prevAccuracy !== null && delta !== null && (
         <div
-          className="rounded-xl p-3 mb-4 text-sm text-center"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+          className="q-card p-3 mb-4 text-sm text-center"
         >
           直近セッション比:{' '}
           <b style={{ color: delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--danger)' : undefined }}>
@@ -59,8 +61,7 @@ export function SummaryScreen({
       )}
 
       <div
-        className="rounded-xl p-3 mb-4 text-sm flex items-center justify-between"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+        className="q-card p-4 mb-4 text-sm flex items-center justify-between"
       >
         <span>最大連続正解</span>
         <b>🔥 {result.maxStreak}</b>
@@ -68,8 +69,7 @@ export function SummaryScreen({
 
       {result.mostHesitant && (
         <div
-          className="rounded-xl p-3 mb-6"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+          className="q-card p-4 mb-6"
         >
           <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
             一番迷ったカード（{(result.mostHesitantMs / 1000).toFixed(1)}秒）
@@ -82,23 +82,20 @@ export function SummaryScreen({
         {result.wrongCards.length > 0 && (
           <button
             onClick={onRetryWrong}
-            className="rounded-lg px-4 py-3 text-sm font-medium"
-            style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
+            className="q-btn q-btn-primary py-3"
           >
             不正解だったカードだけもう一度（{result.wrongCards.length}枚）
           </button>
         )}
         <button
           onClick={restartAll}
-          className="rounded-lg px-4 py-3 text-sm font-medium"
-          style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+          className="q-btn q-btn-outline py-3"
         >
           最初から全部やり直す
         </button>
         <button
           onClick={onFinish}
-          className="rounded-lg px-4 py-3 text-sm font-medium"
-          style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+          className="q-btn q-btn-ghost py-3"
         >
           終了する
         </button>
@@ -111,8 +108,7 @@ export function SummaryScreen({
             {result.wrongCards.map((c) => (
               <li
                 key={c.id}
-                className="rounded-lg p-2.5 grid grid-cols-2 gap-2"
-                style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+                className="q-card p-3 grid grid-cols-2 gap-3"
               >
                 <MiniFace label="表" text={c.front} image={c.frontImage} />
                 <MiniFace label="裏" text={c.back} image={c.backImage} />
@@ -127,14 +123,9 @@ export function SummaryScreen({
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div
-      className="rounded-xl p-3 text-center"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
-    >
-      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </p>
-      <p className="text-xl font-bold" style={{ color }}>
+    <div className="q-card p-4 text-center">
+      <p className="q-label">{label}</p>
+      <p className="text-2xl font-extrabold mt-1" style={{ color }}>
         {value}
       </p>
     </div>
@@ -144,9 +135,7 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
 function MiniFace({ label, text, image }: { label: string; text: string; image: string | null }) {
   return (
     <div className="min-w-0">
-      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </span>
+      <span className="q-label">{label}</span>
       {image && (
         <SmartImage src={image} alt={label} className="w-full h-14 object-cover rounded mt-0.5" />
       )}

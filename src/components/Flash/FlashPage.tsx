@@ -286,24 +286,20 @@ export function FlashPage() {
   const currentCard = queue[index]
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-4 flex-1 flex flex-col">
-      <header className="flex items-center gap-3 mb-4">
-        <Link to="/" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+    <div className="mx-auto w-full max-w-4xl px-4 py-5 flex-1 flex flex-col">
+      <header className="flex items-center gap-3 mb-6">
+        <Link to="/" className="q-btn q-btn-ghost q-btn-sm">
           ← デッキ一覧
         </Link>
-        <h1 className="text-lg font-bold truncate">{deck?.name ?? ''}</h1>
-        <Link
-          to={`/decks/${deckId}/input`}
-          className="ml-auto rounded-lg px-3 py-1.5 text-xs font-medium"
-          style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
-        >
+        <h1 className="text-xl font-extrabold truncate">{deck?.name ?? ''}</h1>
+        <Link to={`/decks/${deckId}/input`} className="q-btn q-btn-outline q-btn-sm ml-auto">
           入力へ
         </Link>
         {phase === 'playing' && (
           <button
             onClick={() => setShowGuide(true)}
-            className="rounded-full w-7 h-7 text-xs"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+            className="q-btn q-btn-ghost"
+            style={{ width: '2rem', height: '2rem', padding: 0 }}
             aria-label="使い方を表示"
           >
             ?
@@ -314,28 +310,29 @@ export function FlashPage() {
       {phase === 'setup' && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 py-12">
           {cards && cards.length === 0 ? (
-            <div className="text-center">
-              <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>
-                このデッキにはまだカードがありません。
+            <div className="q-card px-8 py-10 text-center max-w-sm">
+              <p className="text-5xl mb-3" aria-hidden>
+                🗂
               </p>
-              <Link
-                to={`/decks/${deckId}/input`}
-                className="rounded-lg px-4 py-2 text-sm font-medium"
-                style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
-              >
+              <p className="text-base font-bold mb-1">このデッキにはまだカードがありません</p>
+              <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+                カードを追加すると学習をはじめられます。
+              </p>
+              <Link to={`/decks/${deckId}/input`} className="q-btn q-btn-primary">
                 カードを追加する
               </Link>
             </div>
           ) : (
             <>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                {cards?.length ?? 0}枚のカードを学習します
-              </p>
-              <fieldset className="w-full max-w-xs">
-                <legend className="text-xs mb-2 text-center w-full" style={{ color: 'var(--text-muted)' }}>
-                  出題順
-                </legend>
-                <div className="flex flex-col gap-1.5">
+              <div className="text-center">
+                <p className="text-3xl font-extrabold">{cards?.length ?? 0}枚</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  のカードを学習します
+                </p>
+              </div>
+              <fieldset className="w-full max-w-md">
+                <legend className="q-label mb-2 w-full text-center">出題順</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
                   {ORDER_OPTIONS.map((opt) => {
                     const active = studyOrder === opt.value
                     return (
@@ -346,18 +343,24 @@ export function FlashPage() {
                           localStorage.setItem(ORDER_KEY, opt.value)
                         }}
                         aria-pressed={active}
-                        className="rounded-lg px-3 py-2 text-left text-sm border transition-colors"
-                        style={{
-                          background: active ? 'var(--accent)' : 'var(--surface)',
-                          color: active ? 'var(--accent-contrast)' : 'var(--text)',
-                          borderColor: active ? 'var(--accent)' : 'var(--border)',
-                        }}
+                        className="q-tile px-3 py-3 text-center"
+                        style={
+                          active
+                            ? {
+                                borderColor: 'var(--accent)',
+                                background: 'var(--accent-soft)',
+                                boxShadow: 'none',
+                              }
+                            : undefined
+                        }
                       >
-                        <span className="font-medium">{opt.label}</span>
                         <span
-                          className="block text-xs"
-                          style={{ color: active ? 'var(--accent-contrast)' : 'var(--text-muted)', opacity: active ? 0.8 : 1 }}
+                          className="block text-sm font-bold"
+                          style={{ color: active ? 'var(--accent)' : 'var(--text)' }}
                         >
+                          {opt.label}
+                        </span>
+                        <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                           {opt.hint}
                         </span>
                       </button>
@@ -365,11 +368,7 @@ export function FlashPage() {
                   })}
                 </div>
               </fieldset>
-              <button
-                onClick={startSession}
-                className="rounded-lg px-6 py-3 text-base font-semibold"
-                style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
-              >
+              <button onClick={startSession} className="q-btn q-btn-primary px-8 py-3 text-base">
                 学習をはじめる
               </button>
             </>
@@ -378,33 +377,27 @@ export function FlashPage() {
       )}
 
       {phase === 'playing' && currentCard && (
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span>
-              ラウンド {Math.min(index + 1, queue.length)}/{queue.length}
+        <div className="flex-1 flex flex-col gap-5">
+          <div className="flex items-center justify-center gap-3">
+            <span className="text-2xl font-extrabold tabular-nums">
+              {Math.min(index + 1, queue.length)}
             </span>
-            <span>
-              通算 {Math.min(overallCompleted + 1, overallTotal)}/{overallTotal}
+            <span className="text-lg" style={{ color: 'var(--text-muted)' }}>
+              / {queue.length}
             </span>
-            <button
-              onClick={handleUndo}
-              disabled={!canUndo}
-              className="rounded-lg px-2.5 py-1 font-medium disabled:opacity-30"
-              style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
-            >
-              ↺ 元に戻す
-            </button>
+            {roundNumber > 1 && <span className="q-chip q-chip-accent">再挑戦 {roundNumber}回目</span>}
           </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+          <div
+            className="w-full h-1.5 rounded-full overflow-hidden"
+            style={{ background: 'var(--surface-2)' }}
+          >
             <div
               className="h-full transition-all"
-              style={{
-                width: `${(index / queue.length) * 100}%`,
-                background: 'var(--accent)',
-              }}
+              style={{ width: `${(index / queue.length) * 100}%`, background: 'var(--accent)' }}
             />
           </div>
-          <div className="flex-1 flex items-center justify-center py-2">
+
+          <div className="flex-1 flex items-center justify-center">
             <FlashCard
               key={currentCard.id}
               card={currentCard}
@@ -412,6 +405,52 @@ export function FlashPage() {
               onFlip={() => setIsFlipped((f) => !f)}
               onJudge={handleJudge}
             />
+          </div>
+
+          {/* Bottom control bar: judge either side, flip in the middle. */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => handleJudge(false)}
+              className="q-btn"
+              style={{
+                background: 'var(--danger-bg)',
+                color: 'var(--danger)',
+                width: '3.25rem',
+                height: '3.25rem',
+                fontSize: '1.25rem',
+              }}
+              aria-label="まだ覚えていない（不正解）"
+            >
+              ✕
+            </button>
+            <button
+              onClick={() => setIsFlipped((f) => !f)}
+              className="q-btn q-btn-outline"
+              aria-label="カードを裏返す"
+            >
+              裏返す
+            </button>
+            <button
+              onClick={() => handleJudge(true)}
+              className="q-btn"
+              style={{
+                background: 'var(--success-bg)',
+                color: 'var(--success)',
+                width: '3.25rem',
+                height: '3.25rem',
+                fontSize: '1.25rem',
+              }}
+              aria-label="覚えた（正解）"
+            >
+              ○
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span>通算 {Math.min(overallCompleted + 1, overallTotal)}/{overallTotal}</span>
+            <button onClick={handleUndo} disabled={!canUndo} className="q-btn q-btn-ghost q-btn-sm">
+              ↺ 元に戻す
+            </button>
           </div>
         </div>
       )}

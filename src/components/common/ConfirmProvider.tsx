@@ -64,14 +64,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           role="presentation"
         >
           <div
-            className="w-full max-w-sm rounded-xl p-5"
-            style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+            className="q-card w-full max-w-sm p-6"
+            style={{ boxShadow: 'var(--shadow-lift)' }}
             onClick={(e) => e.stopPropagation()}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
           >
-            <h2 id="confirm-title" className="text-lg font-semibold mb-2">
+            <h2 id="confirm-title" className="text-lg font-extrabold mb-2">
               {options.title}
             </h2>
             {options.message && (
@@ -81,8 +81,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             )}
             {options.extraAction && (
               <button
-                className="w-full mb-3 px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ background: 'var(--surface-2)', color: 'var(--accent)' }}
+                className="q-btn q-btn-outline w-full mb-3"
+                style={{ color: 'var(--accent)' }}
                 onClick={runExtra}
                 disabled={runningExtra}
               >
@@ -91,8 +91,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             )}
             <div className="flex justify-end gap-2">
               <button
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+                className="q-btn q-btn-ghost"
                 onClick={() => close(false)}
                 disabled={runningExtra}
                 autoFocus
@@ -100,10 +99,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {options.cancelLabel ?? 'キャンセル'}
               </button>
               <button
-                className="px-4 py-2 rounded-lg text-sm font-medium"
+                className="q-btn"
                 style={{
                   background: options.danger ? 'var(--danger)' : 'var(--accent)',
-                  color: 'var(--accent-contrast)',
+                  color: options.danger ? '#fff' : 'var(--accent-contrast)',
                 }}
                 onClick={() => close(true)}
                 disabled={runningExtra}

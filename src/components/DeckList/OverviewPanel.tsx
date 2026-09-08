@@ -29,17 +29,17 @@ export function OverviewPanel() {
 
   return (
     <section
-      className="rounded-xl p-4 mb-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
+      className="q-card p-5 mb-5"
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold">全体の記録</h2>
+        <h2 className="text-base font-extrabold">全体の記録</h2>
         <span
-          className="text-xs rounded-full px-2 py-0.5"
-          style={{
-            background: summary.studiedToday ? 'var(--success-bg)' : 'var(--surface-2)',
-            color: summary.studiedToday ? 'var(--success)' : 'var(--text-muted)',
-          }}
+          className="q-chip"
+          style={
+            summary.studiedToday
+              ? { background: 'var(--success-bg)', color: 'var(--success)' }
+              : undefined
+          }
         >
           {summary.studiedToday
             ? `今日は${summary.decksStudiedToday}デッキ学習済み`
@@ -60,11 +60,9 @@ export function OverviewPanel() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg p-2 text-center" style={{ background: 'var(--surface-2)' }}>
-      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </p>
-      <p className="text-base font-bold">{value}</p>
+    <div className="rounded-xl p-3 text-center" style={{ background: 'var(--surface-2)' }}>
+      <p className="q-label">{label}</p>
+      <p className="text-lg font-extrabold mt-0.5">{value}</p>
     </div>
   )
 }

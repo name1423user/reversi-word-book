@@ -225,12 +225,14 @@ export function DeckListPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 flex-1">
-      <header className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold">📚 単語帳</h1>
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 flex-1">
+      <header className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-extrabold flex items-center gap-2">
+          <span aria-hidden>📚</span> 単語帳
+        </h1>
         <ThemeToggle />
       </header>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-5">
         <StorageMeter />
       </div>
 
@@ -238,20 +240,15 @@ export function DeckListPage() {
 
       <OverviewPanel />
 
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-4">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && createDeck()}
           placeholder="新しいデッキ名（例：英単語）"
-          className="flex-1 rounded-lg px-3 py-2 text-sm border"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          className="q-field flex-1"
         />
-        <button
-          onClick={createDeck}
-          className="rounded-lg px-4 py-2 text-sm font-medium"
-          style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
-        >
+        <button onClick={createDeck} className="q-btn q-btn-primary">
           追加
         </button>
       </div>
@@ -260,8 +257,8 @@ export function DeckListPage() {
         <select
           value={sortKey}
           onChange={(e) => changeSort(e.target.value as DeckSortKey)}
-          className="rounded-lg px-2 py-1.5 text-xs border"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          className="q-field"
+          style={{ width: 'auto', padding: '0.35rem 0.6rem', fontSize: '0.8125rem' }}
           aria-label="デッキの並び順"
         >
           {Object.entries(DECK_SORT_LABEL).map(([k, label]) => (
@@ -274,8 +271,7 @@ export function DeckListPage() {
           <button
             onClick={exportBackup}
             disabled={busy}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+            className="q-btn q-btn-outline q-btn-sm"
             title="全デッキを1つのJSONにまとめて書き出します（端末の移行・バックアップ用）"
           >
             ⬇ 全体を書き出す
@@ -283,8 +279,7 @@ export function DeckListPage() {
           <button
             onClick={() => backupFileRef.current?.click()}
             disabled={busy}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+            className="q-btn q-btn-outline q-btn-sm"
             title="書き出したJSONを読み込んでデッキを復元します"
           >
             ⬆ 読み込む
@@ -385,18 +380,17 @@ function DeckRow({
   const streak = computeStreak(studyDates)
 
   return (
-    <li
-      className="rounded-xl p-4"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
-    >
-      <div className="flex items-center justify-between gap-2">
+    <li className="q-tile p-4">
+      {/* Wraps on narrow screens so the deck name keeps its full width and
+          the actions drop to a second line instead of squeezing it. */}
+      <div className="flex flex-wrap items-center gap-3">
         {manualSort && (
-          <div className="flex flex-col shrink-0">
+          <div className="flex flex-col shrink-0 self-center gap-0.5">
             <button
               onClick={onMoveUp}
               disabled={!canMoveUp}
-              className="text-xs leading-none px-1 disabled:opacity-20"
-              style={{ color: 'var(--text-muted)' }}
+              className="text-[10px] leading-none px-1.5 py-1 rounded disabled:opacity-20"
+              style={{ color: 'var(--text-muted)', background: 'var(--surface-2)' }}
               aria-label="上へ移動"
             >
               ▲
@@ -404,15 +398,20 @@ function DeckRow({
             <button
               onClick={onMoveDown}
               disabled={!canMoveDown}
-              className="text-xs leading-none px-1 disabled:opacity-20"
-              style={{ color: 'var(--text-muted)' }}
+              className="text-[10px] leading-none px-1.5 py-1 rounded disabled:opacity-20"
+              style={{ color: 'var(--text-muted)', background: 'var(--surface-2)' }}
               aria-label="下へ移動"
             >
               ▼
             </button>
           </div>
         )}
-        <div className="min-w-0 flex-1">
+
+        <div className="min-w-[9rem] flex-1">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="q-chip">{cardCount}枚</span>
+            {streak > 0 && <span className="q-chip q-chip-accent">🔥 {streak}日連続</span>}
+          </div>
           {renaming ? (
             <input
               autoFocus
@@ -420,57 +419,49 @@ function DeckRow({
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onCommitRename()}
               onBlur={onCommitRename}
-              className="rounded px-2 py-1 text-base font-semibold border w-full"
-              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+              className="q-field text-lg font-bold"
             />
           ) : (
             <button
-              className="text-base font-semibold truncate text-left"
+              className="text-lg font-bold truncate text-left block w-full"
               onClick={onStartRename}
               title="名前を編集"
             >
               {deck.name}
             </button>
           )}
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {cardCount}枚 ・ 🔥{streak}日連続
-          </p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Link
-            to={`/decks/${deck.id}/input`}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium"
-            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
-          >
+
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          <Link to={`/decks/${deck.id}/input`} className="q-btn q-btn-outline q-btn-sm">
             入力
           </Link>
-          <Link
-            to={`/decks/${deck.id}/flash`}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium"
-            style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
-          >
+          <Link to={`/decks/${deck.id}/flash`} className="q-btn q-btn-primary q-btn-sm">
             学習
           </Link>
           <button
             onClick={onToggleExpanded}
-            className="rounded-lg px-2 py-1.5 text-xs"
-            style={{ color: 'var(--text-muted)' }}
+            className="q-btn q-btn-ghost q-btn-sm"
+            style={{ padding: '0.35rem 0.5rem' }}
             aria-label="カレンダーを表示"
           >
             {expanded ? '▲' : '▼'}
           </button>
           <button
             onClick={onDelete}
-            className="rounded-lg px-2 py-1.5 text-xs"
-            style={{ color: 'var(--danger)' }}
+            className="q-btn q-btn-ghost q-btn-sm"
+            style={{ padding: '0.35rem 0.5rem', color: 'var(--danger)' }}
             aria-label="デッキを削除"
           >
-            🗑
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
           </button>
         </div>
       </div>
       {expanded && (
-        <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
           <StreakCalendar studyDates={studyDates} />
         </div>
       )}

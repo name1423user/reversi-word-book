@@ -8,8 +8,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={cycle}
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-      style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+      className="q-btn q-btn-outline q-btn-sm"
       title="表示テーマを切り替え"
       aria-label={`テーマ: ${LABEL[pref]}`}
     >

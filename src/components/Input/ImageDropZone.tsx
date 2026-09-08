@@ -127,8 +127,8 @@ export function ImageDropZone({ label, value, onChange }: Props) {
           placeholder="または画像URLを入力"
           value={isUrlValue ? value! : ''}
           onChange={(e) => replaceValue(e.target.value || null)}
-          className="w-full rounded-lg px-2.5 py-1.5 text-xs border"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          className="q-field"
+          style={{ padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
         />
       </div>
 

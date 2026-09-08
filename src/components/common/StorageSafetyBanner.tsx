@@ -43,7 +43,7 @@ export function StorageSafetyBanner({ hasData }: { hasData: boolean }) {
 
   return (
     <section
-      className="rounded-xl p-4 mb-5 text-sm"
+      className="rounded-2xl p-5 mb-5 text-sm"
       style={{
         background: 'var(--danger-bg)',
         color: 'var(--text)',
@@ -63,8 +63,8 @@ export function StorageSafetyBanner({ hasData }: { hasData: boolean }) {
         {!ios && status === 'transient' && (
           <button
             onClick={onRequest}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium"
-            style={{ background: 'var(--danger)', color: 'var(--accent-contrast)' }}
+            className="q-btn q-btn-sm"
+            style={{ background: 'var(--danger)', color: '#fff' }}
           >
             データを保護する
           </button>
@@ -74,8 +74,7 @@ export function StorageSafetyBanner({ hasData }: { hasData: boolean }) {
             localStorage.setItem(DISMISS_KEY, '1')
             setDismissed(true)
           }}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium"
-          style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+          className="q-btn q-btn-ghost q-btn-sm"
         >
           あとで
         </button>

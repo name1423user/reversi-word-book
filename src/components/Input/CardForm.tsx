@@ -134,18 +134,13 @@ export function CardForm({
   }
 
   return (
-    <div
-      className="rounded-xl p-4 flex flex-col gap-4"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
-    >
+    <div className="q-card p-5 flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{editingCard ? 'カードを編集' : 'カードを追加'}</h2>
+        <h2 className="text-base font-extrabold">
+          {editingCard ? 'カードを編集' : 'カードを追加'}
+        </h2>
         {editingCard && (
-          <button
-            onClick={finishEditing}
-            className="text-xs font-medium"
-            style={{ color: 'var(--accent)' }}
-          >
+          <button onClick={finishEditing} className="q-btn q-btn-ghost q-btn-sm" style={{ color: 'var(--accent)' }}>
             編集を終了
           </button>
         )}
@@ -153,9 +148,7 @@ export function CardForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-            表（おもて）
-          </span>
+          <span className="q-label">表（おもて）</span>
           <textarea
             ref={frontRef}
             value={current.front}
@@ -168,8 +161,7 @@ export function CardForm({
             }}
             placeholder="表面のテキスト"
             rows={3}
-            className="w-full rounded-lg px-3 py-2 text-sm border resize-none"
-            style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+            className="q-field q-field-underline resize-none"
           />
           <ImageDropZone
             label="表"
@@ -179,9 +171,7 @@ export function CardForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-            裏（うら）
-          </span>
+          <span className="q-label">裏（うら）</span>
           <textarea
             value={current.back}
             onChange={(e) => setCurrent((p) => ({ ...p, back: e.target.value }))}
@@ -193,8 +183,7 @@ export function CardForm({
             }}
             placeholder="裏面のテキスト"
             rows={3}
-            className="w-full rounded-lg px-3 py-2 text-sm border resize-none"
-            style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+            className="q-field q-field-underline resize-none"
           />
           <ImageDropZone
             label="裏"
@@ -209,8 +198,7 @@ export function CardForm({
           <button
             onClick={submitNew}
             disabled={isEmpty(draft) || isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
-            style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
+            className="q-btn q-btn-primary"
           >
             このカードを登録（Enter）
           </button>

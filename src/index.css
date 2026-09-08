@@ -1,59 +1,90 @@
 @import "tailwindcss";
 
+/* Quizlet-inspired design tokens.
+ *
+ * The look: a soft off-white ground, crisp white cards with a hairline border
+ * plus a low soft shadow, one saturated indigo accent, and dark navy (rather
+ * than neutral grey) for dark mode. Type is a touch larger and heavier than
+ * the default so cards read from a distance while studying. */
 :root {
-  --bg: #f4f5f7;
+  --bg: #f6f7fb;
   --surface: #ffffff;
-  --surface-2: #eceef2;
-  --border: #dcdfe4;
-  --text: #14171f;
-  --text-muted: #676d7a;
-  --accent: #4f46e5;
+  --surface-2: #edeff4;
+  --border: #d9dde8;
+  --text: #0a092d;
+  --text-muted: #586380;
+
+  --accent: #4255ff;
+  --accent-strong: #3446e0;
+  --accent-soft: #e6e9ff;
   --accent-contrast: #ffffff;
-  --danger: #dc2626;
-  --danger-bg: #fee2e2;
-  --success: #16a34a;
-  --success-bg: #dcfce7;
-  --shadow: 0 1px 2px rgba(15, 17, 21, 0.06), 0 4px 12px rgba(15, 17, 21, 0.06);
-  --overlay: rgba(15, 17, 21, 0.5);
+
+  --star: #ffcd1f;
+  --danger: #c53727;
+  --danger-bg: #fdecea;
+  --success: #128a5b;
+  --success-bg: #dff5ea;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --shadow: 0 1px 2px rgba(10, 9, 45, 0.06), 0 4px 14px rgba(10, 9, 45, 0.06);
+  --shadow-lift: 0 4px 8px rgba(10, 9, 45, 0.09), 0 12px 28px rgba(10, 9, 45, 0.1);
+  --overlay: rgba(10, 9, 45, 0.55);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0f1115;
-    --surface: #1a1d24;
-    --surface-2: #23262e;
-    --border: #32363f;
-    --text: #eef0f4;
-    --text-muted: #9aa1ad;
-    --accent: #818cf8;
-    --accent-contrast: #0f1115;
-    --danger: #f87171;
-    --danger-bg: #3f1d1d;
+    --bg: #0a092d;
+    --surface: #2e3856;
+    --surface-2: #3a4570;
+    --border: #464f6d;
+    --text: #f6f7fb;
+    --text-muted: #a6b0cf;
+
+    --accent: #7c8aff;
+    --accent-strong: #97a2ff;
+    --accent-soft: #2b3163;
+    --accent-contrast: #0a092d;
+
+    --star: #ffcd1f;
+    --danger: #ff8a7e;
+    --danger-bg: #4a2320;
     --success: #4ade80;
-    --success-bg: #123822;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.35);
-    --overlay: rgba(0, 0, 0, 0.6);
+    --success-bg: #143d2c;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lift: 0 6px 14px rgba(0, 0, 0, 0.45), 0 16px 32px rgba(0, 0, 0, 0.45);
+    --overlay: rgba(4, 4, 16, 0.7);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #0f1115;
-  --surface: #1a1d24;
-  --surface-2: #23262e;
-  --border: #32363f;
-  --text: #eef0f4;
-  --text-muted: #9aa1ad;
-  --accent: #818cf8;
-  --accent-contrast: #0f1115;
-  --danger: #f87171;
-  --danger-bg: #3f1d1d;
+  --bg: #0a092d;
+  --surface: #2e3856;
+  --surface-2: #3a4570;
+  --border: #464f6d;
+  --text: #f6f7fb;
+  --text-muted: #a6b0cf;
+
+  --accent: #7c8aff;
+  --accent-strong: #97a2ff;
+  --accent-soft: #2b3163;
+  --accent-contrast: #0a092d;
+
+  --star: #ffcd1f;
+  --danger: #ff8a7e;
+  --danger-bg: #4a2320;
   --success: #4ade80;
-  --success-bg: #123822;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.35);
-  --overlay: rgba(0, 0, 0, 0.6);
+  --success-bg: #143d2c;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 6px 14px rgba(0, 0, 0, 0.45), 0 16px 32px rgba(0, 0, 0, 0.45);
+  --overlay: rgba(4, 4, 16, 0.7);
   color-scheme: dark;
 }
 
@@ -78,6 +109,8 @@ body {
     'Hiragino Kaku Gothic ProN',
     'Noto Sans JP',
     sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
@@ -96,7 +129,172 @@ img {
   max-width: 100%;
 }
 
-/* Scrollbars: keep subtle in both themes without fighting Tailwind resets */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+/* --- UI primitives -------------------------------------------------------
+ * Shared so every screen picks up the same card/button/field treatment
+ * instead of each component re-deriving it inline. */
+
+.q-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* Deck tiles lift on hover the way Quizlet's set tiles do. */
+.q-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.q-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--accent);
+}
+
+.q-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.08s ease;
+}
+.q-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.q-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.q-btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.q-btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.q-btn-outline {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.q-btn-outline:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.q-btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.q-btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.q-btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.q-btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.q-btn-sm {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8125rem;
+}
+
+/* Text fields: quiet by default, a clear accent ring on focus. */
+.q-field {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  font: inherit;
+  font-size: 0.9375rem;
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.q-field::placeholder {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+.q-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Underlined field, used for the term/definition inputs. */
+.q-field-underline {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--border);
+  border-radius: 0;
+  padding: 0.4rem 0.1rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.q-field-underline:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.q-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.q-chip-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Small uppercase-ish label above a group of fields. */
+.q-label {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

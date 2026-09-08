@@ -87,8 +87,12 @@ export function FlashCard({ card, isFlipped, onFlip, onJudge }: Props) {
 
   return (
     <div ref={stageRef} className={styles.stage}>
-      <span className={`${styles.hint} ${styles.hintLeft}`}>✕ 不正解</span>
-      <span className={`${styles.hint} ${styles.hintRight}`}>正解 ○</span>
+      <div className={`${styles.edgeHint} ${styles.edgeLeft}`} aria-hidden>
+        <span className={styles.edgeLabel}>まだ</span>
+      </div>
+      <div className={`${styles.edgeHint} ${styles.edgeRight}`} aria-hidden>
+        <span className={styles.edgeLabel}>できた</span>
+      </div>
       <div
         className={`${styles.dragLayer} ${settling ? styles.settling : ''}`}
         style={{ '--dx': `${dx}px`, '--rot': `${rot}deg` } as React.CSSProperties}
@@ -102,14 +106,16 @@ export function FlashCard({ card, isFlipped, onFlip, onJudge }: Props) {
             className={`${styles.overlay} ${dx > 0 ? styles.overlayCorrect : styles.overlayIncorrect}`}
             style={{ '--overlay-opacity': overlayOpacity } as React.CSSProperties}
           >
-            {dx > 0 ? '○' : '✕'}
+            <span className={styles.overlayBadge}>{dx > 0 ? 'できた' : 'まだ'}</span>
           </div>
         )}
         <div className={`${styles.flipInner} ${isFlipped ? styles.flipped : ''}`}>
           <div className={styles.face}>
+            <span className={styles.faceLabel}>表</span>
             <Face text={card.front} image={card.frontImage} />
           </div>
           <div className={`${styles.face} ${styles.back}`}>
+            <span className={styles.faceLabel}>裏</span>
             <Face text={card.back} image={card.backImage} />
           </div>
         </div>
