@@ -1,0 +1,158 @@
+/* Shared look for the non-flipping practice modes (TypeCard, ChoiceCard).
+ * Mirrors FlashCard.module.css's face styling but as a plain static box —
+ * there's no flip/drag gesture here, just a question and an answer area. */
+
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 46rem;
+  min-height: 20rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 40rem) {
+  .stage {
+    min-height: 0;
+  }
+}
+
+.face {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lift);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.faceContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2.75rem 2rem 2rem;
+  text-align: center;
+}
+
+.faceImage {
+  max-width: 100%;
+  max-height: 11rem;
+  object-fit: contain;
+  border-radius: var(--radius);
+}
+
+.faceText {
+  font-size: clamp(1.5rem, 4.5vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+
+.faceLabel {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Typing mode ------------------------------------------------------------ */
+
+.answerForm {
+  width: 100%;
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.reveal {
+  width: 100%;
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.revealSection + .revealSection {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.revealAnswer {
+  font-size: 1.05rem;
+  font-weight: 600;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* Choice mode -------------------------------------------------------------- */
+
+.choiceGrid {
+  width: 100%;
+  max-width: 28rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+@media (max-width: 26rem) {
+  .choiceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.choiceBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  word-break: break-word;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.choiceBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.choiceBtn:disabled {
+  cursor: default;
+}
+
+.choiceImage {
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+.choiceCorrect {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.choiceIncorrect {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}

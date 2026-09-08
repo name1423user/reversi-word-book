@@ -2,18 +2,22 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../../db'
-import type { Card, SessionResult, StudyOrder } from '../../types'
+import type { Card, PracticeMode, SessionResult, StudyOrder } from '../../types'
 import { shuffled } from '../../lib/shuffle'
 import { byDifficulty } from '../../lib/difficulty'
+import { choiceModeAvailable } from '../../lib/choices'
 import { todayKey } from '../../lib/date'
 import { useToast } from '../common/ToastProvider'
 import { FlashCard } from './FlashCard'
+import { TypeCard } from './TypeCard'
+import { ChoiceCard } from './ChoiceCard'
 import { SummaryScreen } from './SummaryScreen'
 import { FirstTimeGuide } from './FirstTimeGuide'
 import type { RoundJudgment, RoundResult } from './flashTypes'
 
 const GUIDE_KEY = 'wordbook:seenFlashGuide'
 const ORDER_KEY = 'wordbook:studyOrder'
+const MODE_KEY = 'wordbook:studyMode'
 
 type Phase = 'setup' | 'playing' | 'summary'
 
@@ -21,6 +25,12 @@ const ORDER_OPTIONS: { value: StudyOrder; label: string; hint: string }[] = [
   { value: 'shuffle', label: 'シャッフル', hint: '毎回ランダムな順番' },
   { value: 'sequential', label: '順番どおり', hint: '追加した順に出題' },
   { value: 'difficulty', label: '苦手優先', hint: '間違えたカードから出題' },
+]
+
+const MODE_OPTIONS: { value: PracticeMode; label: string; hint: string }[] = [
+  { value: 'flip', label: 'めくって確認', hint: 'カードをめくって自己採点' },
+  { value: 'type', label: '学習モード', hint: '答えを入力してから確認' },
+  { value: 'choice', label: 'テストモード', hint: '4択から選んで自動採点' },
 ]
 
 function orderedByCreation(cards: Card[]): Card[] {
@@ -44,6 +54,11 @@ function loadStudyOrder(): StudyOrder {
     : 'shuffle'
 }
 
+function loadPracticeMode(): PracticeMode {
+  const saved = localStorage.getItem(MODE_KEY)
+  return saved === 'flip' || saved === 'type' || saved === 'choice' ? saved : 'flip'
+}
+
 export function FlashPage() {
   const { deckId } = useParams<{ deckId: string }>()
   const deck = useLiveQuery(() => (deckId ? db.decks.get(deckId) : undefined), [deckId])
@@ -59,6 +74,7 @@ export function FlashPage() {
 
   const { reportError, show } = useToast()
   const [studyOrder, setStudyOrder] = useState<StudyOrder>(loadStudyOrder)
+  const [mode, setMode] = useState<PracticeMode>(loadPracticeMode)
   const [phase, setPhase] = useState<Phase>('setup')
   const [queue, setQueue] = useState<Card[]>([])
   const [index, setIndex] = useState(0)
@@ -80,6 +96,12 @@ export function FlashPage() {
     return [...sessionsForDeck].sort((a, b) => b.finishedAt - a.finishedAt)[0]
   }, [sessionsForDeck])
 
+  // テストモード（4択）needs at least two distinct answers in the deck to
+  // build a real question. Fall back to めくって確認 rather than starting a
+  // mode that can't actually ask anything.
+  const choiceAvailable = useMemo(() => choiceModeAvailable(cards ?? []), [cards])
+  const activeMode: PracticeMode = mode === 'choice' && !choiceAvailable ? 'flip' : mode
+
   const beginRound = (roundCards: Card[], nextRoundNumber: number, extraTotal: number) => {
     roundJudgmentsRef.current = []
     roundStartedAtRef.current = Date.now()
@@ -100,7 +122,9 @@ export function FlashPage() {
     setOverallTotal(0)
     setFrozenBaseline(latestPrimarySession)
     beginRound(q, 1, q.length)
-    if (!localStorage.getItem(GUIDE_KEY)) {
+    // The guide only covers めくって確認's swipe/tap gestures, so it's
+    // irrelevant (and shouldn't get marked "seen") in the other modes.
+    if (activeMode === 'flip' && !localStorage.getItem(GUIDE_KEY)) {
       setShowGuide(true)
       localStorage.setItem(GUIDE_KEY, '1')
     }
@@ -263,7 +287,10 @@ export function FlashPage() {
   }
 
   useEffect(() => {
-    if (phase !== 'playing') return
+    // Arrow/space judging is めくって確認-only: 学習モード has a text input
+    // to type into, and テストモード is judged by clicking an option, so
+    // hijacking arrow keys there would fight the user rather than help.
+    if (phase !== 'playing' || activeMode !== 'flip') return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') {
         e.preventDefault()
@@ -279,7 +306,7 @@ export function FlashPage() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, queue, index])
+  }, [phase, activeMode, queue, index])
 
   if (!deckId) return null
 
@@ -295,7 +322,7 @@ export function FlashPage() {
         <Link to={`/decks/${deckId}/input`} className="q-btn q-btn-outline q-btn-sm ml-auto">
           入力へ
         </Link>
-        {phase === 'playing' && (
+        {phase === 'playing' && activeMode === 'flip' && (
           <button
             onClick={() => setShowGuide(true)}
             className="q-btn q-btn-ghost"
@@ -330,6 +357,48 @@ export function FlashPage() {
                   のカードを学習します
                 </p>
               </div>
+              <fieldset className="w-full max-w-md">
+                <legend className="q-label mb-2 w-full text-center">モード</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {MODE_OPTIONS.map((opt) => {
+                    const active = mode === opt.value
+                    const disabled = opt.value === 'choice' && !choiceAvailable
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setMode(opt.value)
+                          localStorage.setItem(MODE_KEY, opt.value)
+                        }}
+                        disabled={disabled}
+                        aria-pressed={active}
+                        className="q-tile px-3 py-3 text-center"
+                        style={
+                          disabled
+                            ? { opacity: 0.5, cursor: 'not-allowed' }
+                            : active
+                              ? {
+                                  borderColor: 'var(--accent)',
+                                  background: 'var(--accent-soft)',
+                                  boxShadow: 'none',
+                                }
+                              : undefined
+                        }
+                      >
+                        <span
+                          className="block text-sm font-bold"
+                          style={{ color: !disabled && active ? 'var(--accent)' : 'var(--text)' }}
+                        >
+                          {opt.label}
+                        </span>
+                        <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {disabled ? '答えの種類が2つ以上必要です' : opt.hint}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
               <fieldset className="w-full max-w-md">
                 <legend className="q-label mb-2 w-full text-center">出題順</legend>
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -398,53 +467,71 @@ export function FlashPage() {
           </div>
 
           <div className="flex-1 flex items-center justify-center">
-            <FlashCard
-              key={currentCard.id}
-              card={currentCard}
-              isFlipped={isFlipped}
-              onFlip={() => setIsFlipped((f) => !f)}
-              onJudge={handleJudge}
-            />
+            {activeMode === 'flip' && (
+              <FlashCard
+                key={currentCard.id}
+                card={currentCard}
+                isFlipped={isFlipped}
+                onFlip={() => setIsFlipped((f) => !f)}
+                onJudge={handleJudge}
+              />
+            )}
+            {activeMode === 'type' && (
+              <TypeCard key={currentCard.id} card={currentCard} onJudge={handleJudge} />
+            )}
+            {activeMode === 'choice' && (
+              <ChoiceCard
+                key={currentCard.id}
+                card={currentCard}
+                pool={cards ?? []}
+                onJudge={handleJudge}
+              />
+            )}
           </div>
 
-          {/* Bottom control bar: judge either side, flip in the middle. */}
-          <div className="flex items-center justify-center gap-3">
-            <button
-              onClick={() => handleJudge(false)}
-              className="q-btn"
-              style={{
-                background: 'var(--danger-bg)',
-                color: 'var(--danger)',
-                width: '3.25rem',
-                height: '3.25rem',
-                fontSize: '1.25rem',
-              }}
-              aria-label="まだ覚えていない（不正解）"
-            >
-              ✕
-            </button>
-            <button
-              onClick={() => setIsFlipped((f) => !f)}
-              className="q-btn q-btn-outline"
-              aria-label="カードを裏返す"
-            >
-              裏返す
-            </button>
-            <button
-              onClick={() => handleJudge(true)}
-              className="q-btn"
-              style={{
-                background: 'var(--success-bg)',
-                color: 'var(--success)',
-                width: '3.25rem',
-                height: '3.25rem',
-                fontSize: '1.25rem',
-              }}
-              aria-label="覚えた（正解）"
-            >
-              ○
-            </button>
-          </div>
+          {/* Bottom control bar: judge either side, flip in the middle.
+              学習モード/テストモード judge from inside their own card
+              (typed self-check / choice click), so this bar is めくって
+              確認-only. */}
+          {activeMode === 'flip' && (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => handleJudge(false)}
+                className="q-btn"
+                style={{
+                  background: 'var(--danger-bg)',
+                  color: 'var(--danger)',
+                  width: '3.25rem',
+                  height: '3.25rem',
+                  fontSize: '1.25rem',
+                }}
+                aria-label="まだ覚えていない（不正解）"
+              >
+                ✕
+              </button>
+              <button
+                onClick={() => setIsFlipped((f) => !f)}
+                className="q-btn q-btn-outline"
+                aria-label="カードを裏返す"
+              >
+                裏返す
+              </button>
+              <button
+                onClick={() => handleJudge(true)}
+                className="q-btn"
+                style={{
+                  background: 'var(--success-bg)',
+                  color: 'var(--success)',
+                  width: '3.25rem',
+                  height: '3.25rem',
+                  fontSize: '1.25rem',
+                }}
+                aria-label="覚えた（正解）"
+              >
+                ○
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
             <span>通算 {Math.min(overallCompleted + 1, overallTotal)}/{overallTotal}</span>

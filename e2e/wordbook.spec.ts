@@ -101,6 +101,60 @@ test('学習を一周するとサマリーが出て、苦手順に反映され�
   await expect(page.getByRole('listitem').first()).toContainText('正答')
 })
 
+test('学習モード（入力して確認）で自己採点できる', async ({ page }) => {
+  await createDeck(page, '英単語')
+  await gotoDeckInput(page, '英単語')
+  await importCards(page, [
+    { front: 'apple', back: 'りんご' },
+    { front: 'banana', back: 'バナナ' },
+  ])
+
+  await page.getByRole('link', { name: '学習へ' }).click()
+  await page.getByRole('button', { name: '学習モード' }).click()
+  await page.getByRole('button', { name: '順番どおり' }).click()
+  await page.getByRole('button', { name: '学習をはじめる' }).click()
+
+  // First card: type a (wrong) guess, submit, and self-judge it incorrect.
+  await page.getByPlaceholder('答えを入力').fill('ばなな')
+  await page.getByRole('button', { name: '回答する' }).click()
+  await expect(page.getByText('あなたの回答')).toBeVisible()
+  await expect(page.getByText('りんご', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '✕ 不正解' }).click()
+
+  // Second card: answer correctly.
+  await page.getByPlaceholder('答えを入力').fill('バナナ')
+  await page.getByRole('button', { name: '回答する' }).click()
+  await page.getByRole('button', { name: '○ 正解' }).click()
+
+  await expect(page.getByRole('heading', { name: /お疲れさまでした/ })).toBeVisible()
+  await expect(page.getByText('正解率')).toBeVisible()
+})
+
+test('テストモード（4択）で自動採点される', async ({ page }) => {
+  await createDeck(page, '英単語')
+  await gotoDeckInput(page, '英単語')
+  await importCards(page, [
+    { front: 'apple', back: 'りんご' },
+    { front: 'banana', back: 'バナナ' },
+    { front: 'cherry', back: 'さくらんぼ' },
+  ])
+
+  await page.getByRole('link', { name: '学習へ' }).click()
+  await page.getByRole('button', { name: 'テストモード' }).click()
+  await page.getByRole('button', { name: '順番どおり' }).click()
+  await page.getByRole('button', { name: '学習をはじめる' }).click()
+
+  // Sequential order makes the correct answer for each card predictable.
+  for (const answer of ['りんご', 'バナナ', 'さくらんぼ']) {
+    await page.getByRole('button', { name: answer, exact: true }).click()
+    await page.waitForTimeout(800)
+  }
+
+  await expect(page.getByRole('heading', { name: /お疲れさまでした/ })).toBeVisible()
+  await expect(page.getByText('正解率')).toBeVisible()
+  await expect(page.getByText('100%')).toBeVisible()
+})
+
 test('全デッキのバックアップを書き出して読み込める', async ({ page }) => {
   await createDeck(page, '英単語')
   await gotoDeckInput(page, '英単語')
