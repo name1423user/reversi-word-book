@@ -7,26 +7,35 @@ import styles from './PracticeCard.module.css'
 /** How long the picked answer stays highlighted before advancing, so the
  * right/wrong feedback actually registers. */
 const SETTLE_MS = 700
+/** テストモード has no right/wrong colors to read — just enough of a pause
+ * to confirm the tap landed before the next question appears. */
+const SETTLE_MS_NO_FEEDBACK = 300
 
 interface Props {
   card: Card
   /** The rest of the deck, used to draw distractors from. */
   pool: Card[]
   onJudge: (correct: boolean) => void
+  /** 学習モード (default) highlights the picked answer green/red before
+   * advancing. テストモード passes false: grading still happens the same
+   * way underneath, but nothing is revealed mid-round — only the final
+   * summary shows the score, once every question has been answered. */
+  revealFeedback?: boolean
 }
 
-/** テストモード（4択）: pick the right answer out of up to 4 buttons (the
- * correct one plus random distractors from the same deck). Grading is
- * automatic — no self-report needed. Remount this per-card (parent passes
+/** 選択肢: pick the right answer out of up to 4 buttons (the correct one
+ * plus random distractors from the same deck). Grading is automatic — no
+ * self-report needed. Remount this per-card (parent passes
  * `key={card.id}`) so the options are fresh and unpicked each time. */
-export function ChoiceCard({ card, pool, onJudge }: Props) {
+export function ChoiceCard({ card, pool, onJudge, revealFeedback = true }: Props) {
   const options = useMemo(() => buildChoices(card, pool), [card, pool])
   const [pickedId, setPickedId] = useState<string | null>(null)
 
   const pick = (opt: (typeof options)[number]) => {
     if (pickedId) return
     setPickedId(opt.id)
-    window.setTimeout(() => onJudge(opt.correct), SETTLE_MS)
+    const delay = revealFeedback ? SETTLE_MS : SETTLE_MS_NO_FEEDBACK
+    window.setTimeout(() => onJudge(opt.correct), delay)
   }
 
   return (
@@ -45,8 +54,9 @@ export function ChoiceCard({ card, pool, onJudge }: Props) {
               const isPicked = pickedId === opt.id
               const cls = [
                 styles.choiceBtn,
-                decided && opt.correct ? styles.choiceCorrect : '',
-                decided && isPicked && !opt.correct ? styles.choiceIncorrect : '',
+                revealFeedback && decided && opt.correct ? styles.choiceCorrect : '',
+                revealFeedback && decided && isPicked && !opt.correct ? styles.choiceIncorrect : '',
+                !revealFeedback && isPicked ? styles.choiceSelected : '',
               ]
                 .filter(Boolean)
                 .join(' ')

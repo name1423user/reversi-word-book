@@ -1,21 +1,42 @@
 import { useState } from 'react'
 import type { Card } from '../../types'
+import { answersMatch } from '../../lib/gradeAnswer'
 import { SmartImage } from '../common/SmartImage'
 import styles from './PracticeCard.module.css'
+
+/** How long the "回答を記録しました" confirmation stays up in autoGrade
+ * mode before advancing — just enough to register the submit landed. */
+const SUBMIT_SETTLE_MS = 400
 
 interface Props {
   card: Card
   onJudge: (correct: boolean) => void
+  /** テストモード: grade the typed answer automatically (lenient text
+   * compare) and never reveal the correct answer mid-round — the point is
+   * to see the score only after every question is answered. 学習モード
+   * (the default) instead reveals the correct answer immediately and lets
+   * the user self-judge ○/✕. */
+  autoGrade?: boolean
 }
 
-/** 学習モード: type an answer, submit, then compare it against the real
- * answer and self-judge ○/✕ — like FlashCard's flip, but recall is forced
- * by typing instead of just recognizing the back of the card. Remount this
+/** Type an answer, then either self-judge against the reveal (学習モード)
+ * or get graded automatically with no reveal (テストモード). Remount this
  * per-card (parent passes `key={card.id}`) so the input always starts
  * empty. */
-export function TypeCard({ card, onJudge }: Props) {
+export function TypeCard({ card, onJudge, autoGrade = false }: Props) {
   const [answer, setAnswer] = useState('')
   const [revealed, setRevealed] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const submit = () => {
+    if (revealed || submitted) return
+    if (autoGrade) {
+      setSubmitted(true)
+      window.setTimeout(() => onJudge(answersMatch(answer, card.back)), SUBMIT_SETTLE_MS)
+    } else {
+      setRevealed(true)
+    }
+  }
 
   return (
     <div className={styles.stage}>
@@ -27,11 +48,15 @@ export function TypeCard({ card, onJudge }: Props) {
           )}
           {card.front && <p className={styles.faceText}>{card.front}</p>}
 
-          {!revealed ? (
+          {submitted ? (
+            <p className={styles.revealAnswer} style={{ color: 'var(--text-muted)' }}>
+              回答を記録しました
+            </p>
+          ) : !revealed ? (
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                setRevealed(true)
+                submit()
               }}
               className={styles.answerForm}
             >

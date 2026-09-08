@@ -171,6 +171,39 @@ test('テストモード（4択）で自動採点される', async ({ page }) =>
   await expect(page.getByText('100%')).toBeVisible()
 })
 
+test('テストモード（入力）は正誤を出さず自動採点し、結果は最後にまとめて出る', async ({ page }) => {
+  await createDeck(page, '英単語')
+  await gotoDeckInput(page, '英単語')
+  await importCards(page, [
+    { front: 'apple', back: 'りんご' },
+    { front: 'banana', back: 'バナナ' },
+  ])
+
+  await page.getByRole('link', { name: '学習へ' }).click()
+  await page.getByRole('button', { name: 'テストモード' }).click()
+  await page.getByLabel('問題数').fill('2')
+  await page.getByRole('button', { name: '学習をはじめる' }).click()
+
+  // First card: a wrong guess. No reveal, no ○/✕ buttons — just a
+  // confirmation that the answer was recorded, then it moves on.
+  await page.getByPlaceholder('答えを入力').fill('wrong guess')
+  await page.getByRole('button', { name: '回答する' }).click()
+  await expect(page.getByText('回答を記録しました')).toBeVisible()
+  await expect(page.getByText('あなたの回答')).not.toBeVisible()
+  await expect(page.getByRole('button', { name: '○ 正解' })).not.toBeVisible()
+
+  // Second card: a correct (but differently-cased/full-width) answer.
+  await expect(page.getByPlaceholder('答えを入力')).toBeVisible()
+  const secondFront = await page.locator('p').filter({ hasText: /^(apple|banana)$/ }).innerText()
+  const correctAnswer = secondFront === 'apple' ? 'りんご' : 'バナナ'
+  await page.getByPlaceholder('答えを入力').fill(correctAnswer)
+  await page.getByRole('button', { name: '回答する' }).click()
+
+  await expect(page.getByRole('heading', { name: /お疲れさまでした/ })).toBeVisible()
+  await expect(page.getByText('正解率')).toBeVisible()
+  await expect(page.getByText('50%')).toBeVisible()
+})
+
 test('テストモードで問題数を指定できる', async ({ page }) => {
   await createDeck(page, '英単語')
   await gotoDeckInput(page, '英単語')

@@ -156,3 +156,10 @@
   background: var(--danger-bg);
   color: var(--danger);
 }
+
+/* テストモード: acknowledges the tap without giving away right/wrong. */
+.choiceSelected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}

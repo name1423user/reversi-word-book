@@ -479,6 +479,11 @@ export function FlashPage() {
                       )
                     })}
                   </div>
+                  {sessionMode === 'test' && (
+                    <p className="text-xs mt-2 text-center" style={{ color: 'var(--text-muted)' }}>
+                      テストモードは正誤を毎回表示せず、すべて回答し終えてから結果をまとめて確認します。
+                    </p>
+                  )}
                 </fieldset>
               )}
 
@@ -594,7 +599,12 @@ export function FlashPage() {
               />
             )}
             {sessionMode !== 'flip' && activeFormat === 'type' && (
-              <TypeCard key={currentCard.id} card={currentCard} onJudge={handleJudge} />
+              <TypeCard
+                key={currentCard.id}
+                card={currentCard}
+                onJudge={handleJudge}
+                autoGrade={sessionMode === 'test'}
+              />
             )}
             {sessionMode !== 'flip' && activeFormat === 'choice' && (
               <ChoiceCard
@@ -602,6 +612,7 @@ export function FlashPage() {
                 card={currentCard}
                 pool={cards ?? []}
                 onJudge={handleJudge}
+                revealFeedback={sessionMode !== 'test'}
               />
             )}
           </div>
