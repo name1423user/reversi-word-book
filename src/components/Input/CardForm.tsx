@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { db, newId } from '../../db'
 import type { Card } from '../../types'
 import { useDraft } from '../../hooks/useDraft'
+import { draftKeyFor } from '../../lib/draft'
 import { useToast } from '../common/ToastProvider'
 import { ImageDropZone } from './ImageDropZone'
 
@@ -24,10 +25,15 @@ export function CardForm({
   onDoneEditing: () => void
 }) {
   const { reportError } = useToast()
-  const draftKey = `wordbook:draft:${deckId}`
+  const draftKey = draftKeyFor(deckId)
   const [draft, setDraft, clearDraft] = useDraft<DraftShape>(draftKey, EMPTY)
   const [edit, setEdit] = useState<DraftShape>(EMPTY)
   const frontRef = useRef<HTMLTextAreaElement>(null)
+  // Guards against a second submit landing before the first finishes: both
+  // would read the same draft and create two cards pointing at one image
+  // blob, so deleting either would blank the other's image.
+  const submitting = useRef(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Pending debounced write, keyed by the card id it targets — independent
   // of whichever card is currently selected, so switching cards can never
@@ -92,7 +98,9 @@ export function CardForm({
   const isEmpty = (d: DraftShape) => !d.front.trim() && !d.frontImage && !d.back.trim() && !d.backImage
 
   const submitNew = async () => {
-    if (isEmpty(draft)) return
+    if (isEmpty(draft) || submitting.current) return
+    submitting.current = true
+    setIsSubmitting(true)
     const now = Date.now()
     const card: Card = {
       id: newId(),
@@ -111,6 +119,9 @@ export function CardForm({
     } catch (e) {
       reportError(e, 'カードの登録')
       return
+    } finally {
+      submitting.current = false
+      setIsSubmitting(false)
     }
     clearDraft()
     setDraft(() => EMPTY)
@@ -197,7 +208,7 @@ export function CardForm({
         <div className="flex items-center gap-3">
           <button
             onClick={submitNew}
-            disabled={isEmpty(draft)}
+            disabled={isEmpty(draft) || isSubmitting}
             className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
             style={{ background: 'var(--accent)', color: 'var(--accent-contrast)' }}
           >

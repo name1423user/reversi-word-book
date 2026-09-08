@@ -57,7 +57,7 @@ export function FlashPage() {
     [deckId],
   )
 
-  const { reportError } = useToast()
+  const { reportError, show } = useToast()
   const [studyOrder, setStudyOrder] = useState<StudyOrder>(loadStudyOrder)
   const [phase, setPhase] = useState<Phase>('setup')
   const [queue, setQueue] = useState<Card[]>([])
@@ -170,17 +170,26 @@ export function FlashPage() {
     const card = queue[index]
     if (!card) return
     const responseTimeMs = Date.now() - cardShownAtRef.current
-    const prevLastResponseTimeMs = card.lastResponseTimeMs
-    roundJudgmentsRef.current.push({
-      cardId: card.id,
-      correct,
-      responseTimeMs,
-      prevLastResponseTimeMs,
-    })
+    roundJudgmentsRef.current.push({ cardId: card.id, correct, responseTimeMs })
+    // Append inside a transaction, reading the *stored* history rather than
+    // the one on `card`. `queue` is a snapshot taken when the round started,
+    // so building the array from it would silently drop everything written
+    // since — notably the previous round's result when retrying wrong cards.
     db.cards
-      .update(card.id, {
-        lastResponseTimeMs: responseTimeMs,
-        history: [...card.history, { timestamp: Date.now(), correct, responseTimeMs }],
+      .where(':id')
+      .equals(card.id)
+      .modify((stored) => {
+        stored.history = [
+          ...stored.history,
+          { timestamp: Date.now(), correct, responseTimeMs },
+        ]
+        stored.lastResponseTimeMs = responseTimeMs
+        stored.updatedAt = Date.now()
+      })
+      .then((modified) => {
+        if (modified === 0) {
+          show('このカードは削除されているため、結果を記録できませんでした', 'error')
+        }
       })
       .catch((e) => reportError(e, '学習結果の保存'))
     setOverallCompleted((c) => c + 1)
@@ -199,12 +208,20 @@ export function FlashPage() {
     const judgments = roundJudgmentsRef.current
     if (judgments.length === 0) return
     const last = judgments.pop()!
-    const freshCard = await db.cards.get(last.cardId)
-    if (freshCard) {
-      await db.cards.update(last.cardId, {
-        history: freshCard.history.slice(0, -1),
-        lastResponseTimeMs: last.prevLastResponseTimeMs,
-      })
+    try {
+      // Read-modify-write in one transaction so this can't interleave with
+      // the judgment write it is undoing. lastResponseTimeMs is derived from
+      // what remains rather than from a value captured off the snapshot.
+      await db.cards
+        .where(':id')
+        .equals(last.cardId)
+        .modify((stored) => {
+          stored.history = stored.history.slice(0, -1)
+          stored.lastResponseTimeMs = stored.history.at(-1)?.responseTimeMs ?? 0
+          stored.updatedAt = Date.now()
+        })
+    } catch (e) {
+      reportError(e, '判定の取り消し')
     }
     setOverallCompleted((c) => Math.max(0, c - 1))
     setIndex((i) => Math.max(0, i - 1))
@@ -213,15 +230,27 @@ export function FlashPage() {
     setCanUndo(judgments.length > 0)
   }
 
-  const retryWrong = () => {
+  const retryWrong = async () => {
     if (!lastRoundResult) return
+    // Re-read from the DB instead of reusing the finished round's snapshot,
+    // so the retry round sees current content and skips anything deleted
+    // meanwhile.
+    const ids = lastRoundResult.wrongCards.map((c) => c.id)
+    const fresh = (await db.cards.bulkGet(ids)).filter((c): c is Card => !!c)
+    if (fresh.length === 0) {
+      setPhase('setup')
+      return
+    }
     // The order setting carries into retry rounds (per spec).
-    const q = applyOrder(lastRoundResult.wrongCards, studyOrder)
+    const q = applyOrder(fresh, studyOrder)
     beginRound(q, roundNumber + 1, q.length)
   }
 
   const restartAll = () => {
-    if (!cards) return
+    if (!cards || cards.length === 0) {
+      setPhase('setup')
+      return
+    }
     const q = applyOrder(cards, studyOrder)
     setOverallCompleted(0)
     setOverallTotal(0)

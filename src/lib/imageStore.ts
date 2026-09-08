@@ -8,6 +8,7 @@
 // avoids the ~33% base64 size tax and keeps card records small and fast to
 // query/sort, which matters once a deck has many image-heavy cards.
 import { db, newId } from '../db'
+import { draftImageValues } from './draft'
 import { isHttpUrl, toWebpBlob } from './image'
 
 const PREFIX = 'image:'
@@ -30,13 +31,36 @@ export async function storeImageBlob(blob: Blob): Promise<string> {
   return makeRef(id)
 }
 
-/** Delete any blobs referenced among `refs` (non-image-ref values, e.g. URLs
- * or null, are silently ignored). Safe to call speculatively. */
+/** Every image id something still points at: saved cards, plus unsaved
+ * drafts (which the spec promises to keep, so they are roots too). */
+async function collectUsedImageIds(): Promise<Set<string>> {
+  const cards = await db.cards.toArray()
+  const used = new Set<string>()
+  for (const c of cards) {
+    if (isImageRef(c.frontImage)) used.add(refId(c.frontImage))
+    if (isImageRef(c.backImage)) used.add(refId(c.backImage))
+  }
+  for (const value of draftImageValues()) {
+    if (isImageRef(value)) used.add(refId(value))
+  }
+  return used
+}
+
+/** Delete blobs referenced among `refs`, but only those nothing else points
+ * at any more — call it after removing whatever referenced them.
+ *
+ * The reference check is what stops one card's deletion from blanking the
+ * image of another card that happens to share the blob. Skipping a delete
+ * only leaks a blob until the next sweep; deleting a live one loses data,
+ * so this errs toward keeping. */
 export async function deleteImageRefs(
   refs: (string | null | undefined)[],
 ): Promise<void> {
-  const ids = refs.filter(isImageRef).map(refId)
-  if (ids.length > 0) await db.images.bulkDelete(ids)
+  const ids = [...new Set(refs.filter(isImageRef).map(refId))]
+  if (ids.length === 0) return
+  const used = await collectUsedImageIds()
+  const deletable = ids.filter((id) => !used.has(id))
+  if (deletable.length > 0) await db.images.bulkDelete(deletable)
 }
 
 /** Copy the blob behind `ref` so the copy owns its own row. Used when
@@ -88,19 +112,14 @@ export async function importImageField(
   return { ref: null, warning: '未対応の画像形式のため空にしました' }
 }
 
-/** Delete any stored blobs that no card currently references — a safety net
- * for images left behind by abandoned drafts or interrupted edits (normal
- * deletes/replacements already clean up their own images immediately). */
+/** Delete stored blobs that nothing references any more — a safety net for
+ * images left behind by interrupted edits. Unsaved drafts count as
+ * references, so an in-progress card keeps its image across reloads. */
 export async function sweepOrphanImages(): Promise<number> {
-  const [cards, imageIds] = await Promise.all([
-    db.cards.toArray(),
+  const [used, imageIds] = await Promise.all([
+    collectUsedImageIds(),
     db.images.toCollection().primaryKeys(),
   ])
-  const used = new Set<string>()
-  for (const c of cards) {
-    if (isImageRef(c.frontImage)) used.add(refId(c.frontImage))
-    if (isImageRef(c.backImage)) used.add(refId(c.backImage))
-  }
   const orphanIds = (imageIds as string[]).filter((id) => !used.has(id))
   if (orphanIds.length > 0) await db.images.bulkDelete(orphanIds)
   return orphanIds.length

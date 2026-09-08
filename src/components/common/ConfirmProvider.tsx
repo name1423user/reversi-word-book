@@ -24,6 +24,7 @@ export function useConfirm(): ConfirmFn {
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
+  const [runningExtra, setRunningExtra] = useState(false)
   const resolver = useRef<(v: boolean) => void>(null)
 
   const confirm = useCallback<ConfirmFn>((opts) => {
@@ -38,6 +39,20 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     resolver.current?.(result)
   }
 
+  /** Run the extra action to completion with the destructive buttons locked.
+   * Without this, "back it up first" can still be racing when the user
+   * confirms the delete, and the backup can end up missing what it was
+   * meant to preserve. */
+  const runExtra = async () => {
+    if (runningExtra) return
+    setRunningExtra(true)
+    try {
+      await options?.extraAction?.run()
+    } finally {
+      setRunningExtra(false)
+    }
+  }
+
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
@@ -45,7 +60,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'var(--overlay)' }}
-          onClick={() => close(false)}
+          onClick={() => !runningExtra && close(false)}
           role="presentation"
         >
           <div
@@ -68,9 +83,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <button
                 className="w-full mb-3 px-4 py-2 rounded-lg text-sm font-medium"
                 style={{ background: 'var(--surface-2)', color: 'var(--accent)' }}
-                onClick={() => options.extraAction?.run()}
+                onClick={runExtra}
+                disabled={runningExtra}
               >
-                {options.extraAction.label}
+                {runningExtra ? '処理中…' : options.extraAction.label}
               </button>
             )}
             <div className="flex justify-end gap-2">
@@ -78,6 +94,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 className="px-4 py-2 rounded-lg text-sm font-medium"
                 style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
                 onClick={() => close(false)}
+                disabled={runningExtra}
                 autoFocus
               >
                 {options.cancelLabel ?? 'キャンセル'}
@@ -89,6 +106,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   color: 'var(--accent-contrast)',
                 }}
                 onClick={() => close(true)}
+                disabled={runningExtra}
               >
                 {options.confirmLabel ?? '実行する'}
               </button>

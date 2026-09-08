@@ -15,5 +15,4 @@ export interface RoundJudgment {
   cardId: string
   correct: boolean
   responseTimeMs: number
-  prevLastResponseTimeMs: number
 }

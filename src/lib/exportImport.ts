@@ -30,15 +30,23 @@ export interface ExportReport {
   byteSize: number
 }
 
+/** A dead host must not stall an export indefinitely — especially since an
+ * export can be the last step before a delete. */
+const EXTERNAL_FETCH_TIMEOUT_MS = 8000
+
 async function fetchAsDataUrl(url: string): Promise<string | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), EXTERNAL_FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(url, { mode: 'cors' })
+    const res = await fetch(url, { mode: 'cors', signal: controller.signal })
     if (!res.ok) return null
     const blob = await res.blob()
     if (!blob.type.startsWith('image/')) return null
     return await blobToDataUrl(blob)
   } catch {
     return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
