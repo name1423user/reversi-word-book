@@ -2,8 +2,9 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../../db'
-import type { Card, SessionResult } from '../../types'
+import type { Card, SessionResult, StudyOrder } from '../../types'
 import { shuffled } from '../../lib/shuffle'
+import { byDifficulty } from '../../lib/difficulty'
 import { todayKey } from '../../lib/date'
 import { FlashCard } from './FlashCard'
 import { SummaryScreen } from './SummaryScreen'
@@ -11,11 +12,35 @@ import { FirstTimeGuide } from './FirstTimeGuide'
 import type { RoundJudgment, RoundResult } from './flashTypes'
 
 const GUIDE_KEY = 'wordbook:seenFlashGuide'
+const ORDER_KEY = 'wordbook:studyOrder'
 
 type Phase = 'setup' | 'playing' | 'summary'
 
+const ORDER_OPTIONS: { value: StudyOrder; label: string; hint: string }[] = [
+  { value: 'shuffle', label: 'シャッフル', hint: '毎回ランダムな順番' },
+  { value: 'sequential', label: '順番どおり', hint: '追加した順に出題' },
+  { value: 'difficulty', label: '苦手優先', hint: '間違えたカードから出題' },
+]
+
 function orderedByCreation(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/** Apply the chosen study order. 苦手優先 shuffles first so that cards with
+ * identical scores (e.g. a deck of all-new cards) don't always appear in the
+ * same order. */
+function applyOrder(cards: Card[], order: StudyOrder): Card[] {
+  const base = orderedByCreation(cards)
+  if (order === 'sequential') return base
+  if (order === 'shuffle') return shuffled(base)
+  return byDifficulty(shuffled(base))
+}
+
+function loadStudyOrder(): StudyOrder {
+  const saved = localStorage.getItem(ORDER_KEY)
+  return saved === 'sequential' || saved === 'shuffle' || saved === 'difficulty'
+    ? saved
+    : 'shuffle'
 }
 
 export function FlashPage() {
@@ -31,7 +56,7 @@ export function FlashPage() {
     [deckId],
   )
 
-  const [shuffleOn, setShuffleOn] = useState(true)
+  const [studyOrder, setStudyOrder] = useState<StudyOrder>(loadStudyOrder)
   const [phase, setPhase] = useState<Phase>('setup')
   const [queue, setQueue] = useState<Card[]>([])
   const [index, setIndex] = useState(0)
@@ -68,8 +93,7 @@ export function FlashPage() {
 
   const startSession = () => {
     if (!cards || cards.length === 0) return
-    const ordered = orderedByCreation(cards)
-    const q = shuffleOn ? shuffled(ordered) : ordered
+    const q = applyOrder(cards, studyOrder)
     setOverallCompleted(0)
     setOverallTotal(0)
     setFrozenBaseline(latestPrimarySession)
@@ -183,14 +207,14 @@ export function FlashPage() {
 
   const retryWrong = () => {
     if (!lastRoundResult) return
-    const q = shuffleOn ? shuffled(lastRoundResult.wrongCards) : lastRoundResult.wrongCards
+    // The order setting carries into retry rounds (per spec).
+    const q = applyOrder(lastRoundResult.wrongCards, studyOrder)
     beginRound(q, roundNumber + 1, q.length)
   }
 
   const restartAll = () => {
     if (!cards) return
-    const ordered = orderedByCreation(cards)
-    const q = shuffleOn ? shuffled(ordered) : ordered
+    const q = applyOrder(cards, studyOrder)
     setOverallCompleted(0)
     setOverallTotal(0)
     setFrozenBaseline(latestPrimarySession)
@@ -270,21 +294,40 @@ export function FlashPage() {
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 {cards?.length ?? 0}枚のカードを学習します
               </p>
-              <label className="flex items-center gap-3 text-sm">
-                <span>シャッフルする</span>
-                <button
-                  role="switch"
-                  aria-checked={shuffleOn}
-                  onClick={() => setShuffleOn((s) => !s)}
-                  className="w-11 h-6 rounded-full relative transition-colors"
-                  style={{ background: shuffleOn ? 'var(--accent)' : 'var(--surface-2)' }}
-                >
-                  <span
-                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-                    style={{ transform: `translateX(${shuffleOn ? '22px' : '2px'})` }}
-                  />
-                </button>
-              </label>
+              <fieldset className="w-full max-w-xs">
+                <legend className="text-xs mb-2 text-center w-full" style={{ color: 'var(--text-muted)' }}>
+                  出題順
+                </legend>
+                <div className="flex flex-col gap-1.5">
+                  {ORDER_OPTIONS.map((opt) => {
+                    const active = studyOrder === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setStudyOrder(opt.value)
+                          localStorage.setItem(ORDER_KEY, opt.value)
+                        }}
+                        aria-pressed={active}
+                        className="rounded-lg px-3 py-2 text-left text-sm border transition-colors"
+                        style={{
+                          background: active ? 'var(--accent)' : 'var(--surface)',
+                          color: active ? 'var(--accent-contrast)' : 'var(--text)',
+                          borderColor: active ? 'var(--accent)' : 'var(--border)',
+                        }}
+                      >
+                        <span className="font-medium">{opt.label}</span>
+                        <span
+                          className="block text-xs"
+                          style={{ color: active ? 'var(--accent-contrast)' : 'var(--text-muted)', opacity: active ? 0.8 : 1 }}
+                        >
+                          {opt.hint}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
               <button
                 onClick={startSession}
                 className="rounded-lg px-6 py-3 text-base font-semibold"

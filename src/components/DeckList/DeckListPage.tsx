@@ -1,17 +1,43 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../../db'
-import type { Deck } from '../../types'
+import type { Deck, DeckSortKey } from '../../types'
 import { computeStreak } from '../../lib/date'
 import { deleteImageRefs } from '../../lib/imageStore'
+import {
+  buildCards,
+  downloadJson,
+  exportAllDecks,
+  exportDeck,
+  exportFilename,
+  formatBytes,
+  parseImportJson,
+} from '../../lib/exportImport'
 import { useConfirm } from '../common/ConfirmProvider'
 import { StorageMeter } from '../common/StorageMeter'
 import { StreakCalendar } from '../Streak/StreakCalendar'
 import { ThemeToggle } from '../common/ThemeToggle'
+import { OverviewPanel } from './OverviewPanel'
+
+const SORT_KEY_STORAGE = 'wordbook:deckSort'
+
+const DECK_SORT_LABEL: Record<DeckSortKey, string> = {
+  manual: '手動（↑↓で並び替え）',
+  createdDesc: '作成日（新しい順）',
+  nameAsc: '名前順',
+  countDesc: 'カード枚数順',
+}
+
+function loadDeckSort(): DeckSortKey {
+  const saved = localStorage.getItem(SORT_KEY_STORAGE)
+  return saved === 'manual' || saved === 'createdDesc' || saved === 'nameAsc' || saved === 'countDesc'
+    ? saved
+    : 'manual'
+}
 
 export function DeckListPage() {
-  const decks = useLiveQuery(() => db.decks.orderBy('createdAt').reverse().toArray(), [])
+  const decks = useLiveQuery(() => db.decks.toArray(), [])
   const cardCounts = useLiveQuery(async () => {
     const cards = await db.cards.toArray()
     const map = new Map<string, number>()
@@ -20,31 +46,83 @@ export function DeckListPage() {
   }, [])
   const [newName, setNewName] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<DeckSortKey>(loadDeckSort)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const confirm = useConfirm()
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const backupFileRef = useRef<HTMLInputElement>(null)
+
+  const sortedDecks = useMemo(() => {
+    if (!decks) return []
+    const list = [...decks]
+    switch (sortKey) {
+      case 'createdDesc':
+        return list.sort((a, b) => b.createdAt - a.createdAt)
+      case 'nameAsc':
+        return list.sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+      case 'countDesc':
+        return list.sort(
+          (a, b) => (cardCounts?.get(b.id) ?? 0) - (cardCounts?.get(a.id) ?? 0),
+        )
+      case 'manual':
+      default:
+        return list.sort((a, b) => a.order - b.order)
+    }
+  }, [decks, sortKey, cardCounts])
+
+  const changeSort = (key: DeckSortKey) => {
+    setSortKey(key)
+    localStorage.setItem(SORT_KEY_STORAGE, key)
+  }
 
   const createDeck = async () => {
     const name = newName.trim()
     if (!name) return
-    await db.decks.add({ id: newId(), name, createdAt: Date.now() })
+    const now = Date.now()
+    // New decks go to the top of the manual order.
+    const minOrder = decks?.reduce((min, d) => Math.min(min, d.order), Infinity) ?? 0
+    const order = Number.isFinite(minOrder) ? minOrder - 1 : now
+    await db.decks.add({ id: newId(), name, createdAt: now, order })
     setNewName('')
   }
 
-  const deleteDeck = async (id: string, name: string) => {
+  /** Swap manual order with the neighbouring deck in the given direction. */
+  const moveDeck = async (deck: Deck, direction: -1 | 1) => {
+    const index = sortedDecks.findIndex((d) => d.id === deck.id)
+    const neighbour = sortedDecks[index + direction]
+    if (!neighbour) return
+    await db.transaction('rw', db.decks, async () => {
+      await db.decks.update(deck.id, { order: neighbour.order })
+      await db.decks.update(neighbour.id, { order: deck.order })
+    })
+  }
+
+  const exportOneDeck = async (deck: Deck) => {
+    const report = await exportDeck(deck.id, { mode: 'backup', fetchExternal: true })
+    downloadJson(report.json, exportFilename(deck.name, 'backup'))
+    return report
+  }
+
+  const deleteDeck = async (deck: Deck) => {
     const ok = await confirm({
-      title: `「${name}」を削除しますか？`,
+      title: `「${deck.name}」を削除しますか？`,
       message: 'このデッキのカード・学習履歴もすべて削除されます。この操作は取り消せません。',
       confirmLabel: '削除する',
       danger: true,
+      extraAction: {
+        label: '⬇ 先にJSONで書き出す',
+        run: () => exportOneDeck(deck).then(() => undefined),
+      },
     })
     if (!ok) return
-    const deckCards = await db.cards.where('deckId').equals(id).toArray()
+    const deckCards = await db.cards.where('deckId').equals(deck.id).toArray()
     await db.transaction('rw', db.decks, db.cards, db.sessions, db.studyDays, async () => {
-      await db.decks.delete(id)
-      await db.cards.where('deckId').equals(id).delete()
-      await db.sessions.where('deckId').equals(id).delete()
-      await db.studyDays.where('deckId').equals(id).delete()
+      await db.decks.delete(deck.id)
+      await db.cards.where('deckId').equals(deck.id).delete()
+      await db.sessions.where('deckId').equals(deck.id).delete()
+      await db.studyDays.where('deckId').equals(deck.id).delete()
     })
     await deleteImageRefs(deckCards.flatMap((c) => [c.frontImage, c.backImage]))
   }
@@ -53,6 +131,74 @@ export function DeckListPage() {
     const name = renameValue.trim()
     if (name) await db.decks.update(id, { name })
     setRenaming(null)
+  }
+
+  const exportBackup = async () => {
+    setBusy(true)
+    setNotice(null)
+    try {
+      const report = await exportAllDecks({ mode: 'backup', fetchExternal: true })
+      downloadJson(
+        report.json,
+        exportFilename(`wordbook-${new Date().toISOString().slice(0, 10)}`, 'backup'),
+      )
+      const parts = [
+        `全${report.cardCount}枚を書き出しました（${formatBytes(report.byteSize)}）`,
+      ]
+      if (report.externalNotFetched > 0) {
+        parts.push(`外部URLの画像${report.externalNotFetched}件はリンクのまま`)
+      }
+      setNotice(parts.join(' / '))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const importBackup = async (text: string) => {
+    setNotice(null)
+    let parsed
+    try {
+      parsed = parseImportJson(text)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '解析に失敗しました')
+      return
+    }
+
+    const ok = await confirm({
+      title: 'バックアップを読み込みますか？',
+      message: `${parsed.decks.length}個のデッキ（${parsed.totalCards}枚）を新しいデッキとして追加します。既存のデッキはそのまま残ります。`,
+      confirmLabel: '読み込む',
+    })
+    if (!ok) return
+
+    setBusy(true)
+    try {
+      let addedDecks = 0
+      let addedCards = 0
+      const warnings: string[] = []
+      const baseOrder = decks?.reduce((min, d) => Math.min(min, d.order), 0) ?? 0
+      for (let i = 0; i < parsed.decks.length; i++) {
+        const entry = parsed.decks[i]
+        const now = Date.now()
+        const deckId = newId()
+        await db.decks.add({
+          id: deckId,
+          name: entry.name || `読み込んだデッキ${i + 1}`,
+          createdAt: now,
+          order: baseOrder - parsed.decks.length + i,
+        })
+        addedDecks++
+        const { cards, warnings: w } = await buildCards(deckId, entry.cards, now)
+        if (cards.length > 0) await db.cards.bulkAdd(cards)
+        addedCards += cards.length
+        warnings.push(...w)
+      }
+      const parts = [`${addedDecks}デッキ / ${addedCards}枚を読み込みました`]
+      if (warnings.length > 0) parts.push(`画像${warnings.length}件は読み込めませんでした`)
+      setNotice(parts.join(' / '))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -65,7 +211,9 @@ export function DeckListPage() {
         <StorageMeter />
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <OverviewPanel />
+
+      <div className="flex gap-2 mb-3">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -83,6 +231,59 @@ export function DeckListPage() {
         </button>
       </div>
 
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+        <select
+          value={sortKey}
+          onChange={(e) => changeSort(e.target.value as DeckSortKey)}
+          className="rounded-lg px-2 py-1.5 text-xs border"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          aria-label="デッキの並び順"
+        >
+          {Object.entries(DECK_SORT_LABEL).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportBackup}
+            disabled={busy}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+            title="全デッキを1つのJSONにまとめて書き出します（端末の移行・バックアップ用）"
+          >
+            ⬇ 全体を書き出す
+          </button>
+          <button
+            onClick={() => backupFileRef.current?.click()}
+            disabled={busy}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+            title="書き出したJSONを読み込んでデッキを復元します"
+          >
+            ⬆ 読み込む
+          </button>
+          <input
+            ref={backupFileRef}
+            type="file"
+            accept=".json,application/json,text/plain"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) await importBackup(await file.text())
+            }}
+          />
+        </div>
+      </div>
+
+      {notice && (
+        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+          {notice}
+        </p>
+      )}
+
       {decks?.length === 0 && (
         <p className="text-sm text-center py-12" style={{ color: 'var(--text-muted)' }}>
           まだデッキがありません。上のフォームから作成してください。
@@ -90,14 +291,19 @@ export function DeckListPage() {
       )}
 
       <ul className="flex flex-col gap-3">
-        {decks?.map((deck) => (
+        {sortedDecks.map((deck, i) => (
           <DeckRow
             key={deck.id}
             deck={deck}
             cardCount={cardCounts?.get(deck.id) ?? 0}
             expanded={expanded === deck.id}
             onToggleExpanded={() => setExpanded(expanded === deck.id ? null : deck.id)}
-            onDelete={() => deleteDeck(deck.id, deck.name)}
+            onDelete={() => deleteDeck(deck)}
+            manualSort={sortKey === 'manual'}
+            canMoveUp={i > 0}
+            canMoveDown={i < sortedDecks.length - 1}
+            onMoveUp={() => moveDeck(deck, -1)}
+            onMoveDown={() => moveDeck(deck, 1)}
             renaming={renaming === deck.id}
             renameValue={renameValue}
             onStartRename={() => {
@@ -119,6 +325,11 @@ function DeckRow({
   expanded,
   onToggleExpanded,
   onDelete,
+  manualSort,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   renaming,
   renameValue,
   onStartRename,
@@ -130,6 +341,11 @@ function DeckRow({
   expanded: boolean
   onToggleExpanded: () => void
   onDelete: () => void
+  manualSort: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
   renaming: boolean
   renameValue: string
   onStartRename: () => void
@@ -149,6 +365,28 @@ function DeckRow({
       style={{ background: 'var(--surface)', boxShadow: 'var(--shadow)' }}
     >
       <div className="flex items-center justify-between gap-2">
+        {manualSort && (
+          <div className="flex flex-col shrink-0">
+            <button
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              className="text-xs leading-none px-1 disabled:opacity-20"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="上へ移動"
+            >
+              ▲
+            </button>
+            <button
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              className="text-xs leading-none px-1 disabled:opacity-20"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="下へ移動"
+            >
+              ▼
+            </button>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           {renaming ? (
             <input

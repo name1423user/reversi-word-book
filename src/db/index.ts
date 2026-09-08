@@ -17,6 +17,17 @@ class WordBookDB extends Dexie {
       studyDays: 'id, deckId, date',
       images: 'id, createdAt',
     })
+    // v2 adds manual deck ordering; existing decks keep their creation order.
+    this.version(2)
+      .stores({ decks: 'id, createdAt, name, order' })
+      .upgrade((tx) =>
+        tx
+          .table('decks')
+          .toCollection()
+          .modify((deck) => {
+            if (typeof deck.order !== 'number') deck.order = deck.createdAt
+          }),
+      )
   }
 }
 

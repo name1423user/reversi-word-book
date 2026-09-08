@@ -1,23 +1,22 @@
-// Generates simple solid-color PWA icon PNGs with a centered rounded square,
-// with no external dependencies (raw PNG encoder via zlib deflate).
+// Generates the PWA icons with no external dependencies (raw PNG encoder via
+// zlib deflate). The mark: two stacked cards — a tilted back card and a front
+// card bearing a "反" glyph block — on an indigo gradient, echoing the
+// flip-both-sides idea the app is built around.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 
 function crc32(buf) {
-  let c
   const table = crc32.table || (crc32.table = (() => {
     const t = new Uint32Array(256)
     for (let n = 0; n < 256; n++) {
-      c = n
+      let c = n
       for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
       t[n] = c >>> 0
     }
     return t
   })())
   let crc = 0xffffffff
-  for (let i = 0; i < buf.length; i++) {
-    crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8)
-  }
+  for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8)
   return (crc ^ 0xffffffff) >>> 0
 }
 
@@ -30,15 +29,13 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf])
 }
 
-function makePng(size, draw) {
-  const width = size
-  const height = size
-  const raw = Buffer.alloc((width * 4 + 1) * height)
-  for (let y = 0; y < height; y++) {
-    let rowStart = y * (width * 4 + 1)
-    raw[rowStart] = 0 // filter type none
-    for (let x = 0; x < width; x++) {
-      const [r, g, b, a] = draw(x, y, width, height)
+function makePng(size, sample) {
+  const raw = Buffer.alloc((size * 4 + 1) * size)
+  for (let y = 0; y < size; y++) {
+    const rowStart = y * (size * 4 + 1)
+    raw[rowStart] = 0 // filter: none
+    for (let x = 0; x < size; x++) {
+      const [r, g, b, a] = sample(x, y, size)
       const o = rowStart + 1 + x * 4
       raw[o] = r
       raw[o + 1] = g
@@ -47,59 +44,101 @@ function makePng(size, draw) {
     }
   }
   const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(width, 0)
-  ihdr.writeUInt32BE(height, 4)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
   ihdr[8] = 8 // bit depth
-  ihdr[9] = 6 // color type RGBA
-  ihdr[10] = 0
-  ihdr[11] = 0
-  ihdr[12] = 0
-  const idat = deflateSync(raw)
-  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  ihdr[9] = 6 // RGBA
   return Buffer.concat([
-    sig,
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
+    chunk('IDAT', deflateSync(raw, { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ])
 }
 
-// Background: indigo-ish gradient-free solid (#4f46e5), a lighter rounded
-// "card" square, and a simple diagonal split (reversi flip motif) in two tones.
-function draw(x, y, w, h) {
-  const bg = [79, 70, 229, 255] // indigo-600
-  const cardLight = [238, 242, 255, 255] // indigo-50
-  const cardDark = [199, 210, 254, 255] // indigo-200
-  const pad = w * 0.16
-  const r = w * 0.14
-  const inCard = x > pad && x < w - pad && y > pad && y < h - pad
-  if (!inCard) return bg
-  // simple rounded-corner mask using distance to nearest corner center
-  const corners = [
-    [pad + r, pad + r],
-    [w - pad - r, pad + r],
-    [pad + r, h - pad - r],
-    [w - pad - r, h - pad - r],
-  ]
-  for (const [cx, cy] of corners) {
-    const nearX = x < cx ? -1 : x > cx ? 1 : 0
-    const nearY = y < cy ? -1 : y > cy ? 1 : 0
-    if (nearX !== 0 && nearY !== 0) {
-      const inCornerBox =
-        (nearX < 0 ? x < cx : x > cx) && (nearY < 0 ? y < cy : y > cy)
-      if (inCornerBox) {
-        const d = Math.hypot(x - cx, y - cy)
-        if (d > r) return bg
-      }
+const lerp = (a, b, t) => a + (b - a) * t
+const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t), 255]
+
+/** Signed distance to a rounded rectangle, in the rect's own space. */
+function roundedRectSdf(px, py, cx, cy, halfW, halfH, radius) {
+  const dx = Math.abs(px - cx) - (halfW - radius)
+  const dy = Math.abs(py - cy) - (halfH - radius)
+  const outside = Math.hypot(Math.max(dx, 0), Math.max(dy, 0))
+  return outside + Math.min(Math.max(dx, dy), 0) - radius
+}
+
+/** Rotate a point around a centre by -angle (i.e. into the shape's space). */
+function unrotate(px, py, cx, cy, angle) {
+  const s = Math.sin(-angle)
+  const c = Math.cos(-angle)
+  const dx = px - cx
+  const dy = py - cy
+  return [cx + dx * c - dy * s, cy + dx * s + dy * c]
+}
+
+// Palette (matches the app's indigo accent)
+const BG_TOP = [99, 91, 255]
+const BG_BOTTOM = [67, 56, 202]
+const BACK_CARD = [165, 180, 252]
+const FRONT_CARD = [255, 255, 255]
+const GLYPH = [79, 70, 229]
+const SHADOW = [49, 46, 129]
+
+function sample(x, y, size) {
+  const u = (x + 0.5) / size
+  const v = (y + 0.5) / size
+  // Anti-aliasing width in normalized units.
+  const aa = 1.2 / size
+
+  let color = mix(BG_TOP, BG_BOTTOM, (u + v) / 2)
+
+  const blend = (base, layer, sdf, softness = aa) => {
+    const coverage = 1 - Math.min(1, Math.max(0, sdf / softness + 0.5))
+    if (coverage <= 0) return base
+    return [
+      lerp(base[0], layer[0], coverage),
+      lerp(base[1], layer[1], coverage),
+      lerp(base[2], layer[2], coverage),
+      255,
+    ]
+  }
+
+  // Back card: tilted, peeking out behind the front one.
+  const backAngle = -0.20
+  const [bx, by] = unrotate(u, v, 0.46, 0.5, backAngle)
+  const backSdf = roundedRectSdf(bx, by, 0.46, 0.5, 0.235, 0.30, 0.055)
+  color = blend(color, SHADOW, backSdf - 0.012, aa * 3) // soft drop shadow
+  color = blend(color, BACK_CARD, backSdf)
+
+  // Front card: upright, slightly offset the other way.
+  const frontAngle = 0.06
+  const [fx, fy] = unrotate(u, v, 0.55, 0.52, frontAngle)
+  const frontSdf = roundedRectSdf(fx, fy, 0.55, 0.52, 0.235, 0.30, 0.055)
+  color = blend(color, SHADOW, frontSdf - 0.010, aa * 3)
+  color = blend(color, FRONT_CARD, frontSdf)
+
+  // Glyph on the front card: three stacked bars reading as text lines, with
+  // the middle one shorter — legible even at 32px.
+  if (frontSdf < 0) {
+    const bars = [
+      { cy: 0.42, halfW: 0.135 },
+      { cy: 0.52, halfW: 0.095 },
+      { cy: 0.62, halfW: 0.135 },
+    ]
+    for (const bar of bars) {
+      const sdf = roundedRectSdf(fx, fy, 0.55, bar.cy, bar.halfW, 0.026, 0.026)
+      color = blend(color, GLYPH, sdf)
     }
   }
-  // diagonal split for a subtle "flip" motif
-  return x - pad + (y - pad) < w - pad * 2 ? cardLight : cardDark
+
+  return [Math.round(color[0]), Math.round(color[1]), Math.round(color[2]), 255]
 }
 
 mkdirSync(new URL('../public/icons', import.meta.url), { recursive: true })
 for (const size of [192, 512]) {
-  const png = makePng(size, draw)
-  writeFileSync(new URL(`../public/icons/icon-${size}.png`, import.meta.url), png)
+  writeFileSync(
+    new URL(`../public/icons/icon-${size}.png`, import.meta.url),
+    makePng(size, sample),
+  )
   console.log(`wrote icon-${size}.png`)
 }

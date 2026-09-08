@@ -7,6 +7,9 @@ interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  /** Optional third button that runs without closing the dialog — used for
+   * safety nets like "export this deck before deleting it". */
+  extraAction?: { label: string; run: () => void | Promise<void> }
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
@@ -57,9 +60,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               {options.title}
             </h2>
             {options.message && (
-              <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm mb-5 whitespace-pre-wrap" style={{ color: 'var(--text-muted)' }}>
                 {options.message}
               </p>
+            )}
+            {options.extraAction && (
+              <button
+                className="w-full mb-3 px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ background: 'var(--surface-2)', color: 'var(--accent)' }}
+                onClick={() => options.extraAction?.run()}
+              >
+                {options.extraAction.label}
+              </button>
             )}
             <div className="flex justify-end gap-2">
               <button

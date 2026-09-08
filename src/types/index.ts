@@ -43,6 +43,9 @@ export interface Deck {
   id: string
   name: string
   createdAt: number
+  /** Position under manual ordering. Seeded from createdAt for decks that
+   * predate manual sorting. */
+  order: number
 }
 
 export interface SessionResult {
@@ -64,6 +67,25 @@ export interface StudyDay {
   date: string // YYYY-MM-DD, local time
 }
 
-export type SortKey = 'createdDesc' | 'createdAsc' | 'textAsc' | 'textDesc'
+export type SortKey =
+  | 'createdDesc'
+  | 'createdAsc'
+  | 'textAsc'
+  | 'textDesc'
+  | 'difficultyDesc'
+
+export type DeckSortKey = 'manual' | 'createdDesc' | 'nameAsc' | 'countDesc'
+
+/** Order cards are presented in during a study session. */
+export type StudyOrder = 'sequential' | 'shuffle' | 'difficulty'
 
 export type Judgment = 'correct' | 'incorrect'
+
+/** Whole-app backup: every deck with its cards. Distinguished from the
+ * spec's bare card-array format by the `decks` key. */
+export interface BackupJson {
+  format: 'reversi-word-book'
+  version: 1
+  exportedAt: string
+  decks: { name: string; cards: CardJson[] }[]
+}

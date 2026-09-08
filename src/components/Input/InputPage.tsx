@@ -37,7 +37,7 @@ export function InputPage() {
             editingCard={editingCard}
             onDoneEditing={() => setEditingCard(null)}
           />
-          <BulkPanel deckId={deckId} />
+          <BulkPanel deckId={deckId} deckName={deck?.name ?? ''} />
         </div>
         <CardList
           deckId={deckId}

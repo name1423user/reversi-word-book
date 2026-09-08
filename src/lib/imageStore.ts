@@ -39,6 +39,17 @@ export async function deleteImageRefs(
   if (ids.length > 0) await db.images.bulkDelete(ids)
 }
 
+/** Copy the blob behind `ref` so the copy owns its own row. Used when
+ * duplicating a card: sharing one blob between two cards would mean deleting
+ * either card yanks the image out from under the other. External URLs are
+ * returned unchanged (nothing local to own). */
+export async function duplicateImageRef(ref: string | null): Promise<string | null> {
+  if (!ref) return null
+  if (!isImageRef(ref)) return ref
+  const blob = await getImageBlob(ref)
+  return blob ? storeImageBlob(blob) : null
+}
+
 export async function getImageBlob(ref: string): Promise<Blob | null> {
   if (!isImageRef(ref)) return null
   const row = await db.images.get(refId(ref))
