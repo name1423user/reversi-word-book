@@ -1,6 +1,7 @@
 {
   "name": "reversi-word-book",
   "private": true,
+  "description": "表・裏どちらにも画像を入れられるフラッシュカード単語帳PWA",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
