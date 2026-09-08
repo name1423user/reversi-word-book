@@ -11,13 +11,24 @@ export interface Card {
   id: string
   deckId: string
   front: string
-  frontImage: string | null // data URL (webp) or external http(s) URL
+  // `image:<id>` reference into the `images` table (uploaded/pasted), an
+  // external http(s) URL, or null.
+  frontImage: string | null
   back: string
   backImage: string | null
   lastResponseTimeMs: number
   history: CardHistoryEntry[]
   createdAt: number
   updatedAt: number
+}
+
+/** A binary image blob, stored out-of-line from the card row it belongs to
+ * (referenced as `image:<id>`) so card records stay small and IndexedDB
+ * doesn't pay the ~33% size tax of base64-encoding every image. */
+export interface StoredImage {
+  id: string
+  blob: Blob
+  createdAt: number
 }
 
 /** The subset of Card fields carried by JSON import/export. */

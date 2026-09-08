@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db'
 import type { Card, SortKey } from '../../types'
+import { deleteImageRefs } from '../../lib/imageStore'
 import { useConfirm } from '../common/ConfirmProvider'
 import { SmartImage } from '../common/SmartImage'
 
@@ -63,7 +64,9 @@ export function CardList({
       confirmLabel: '削除する',
       danger: true,
     })
-    if (ok) await db.cards.delete(card.id)
+    if (!ok) return
+    await db.cards.delete(card.id)
+    await deleteImageRefs([card.frontImage, card.backImage])
   }
 
   return (

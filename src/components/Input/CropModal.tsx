@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
-import { cropToWebp } from '../../lib/image'
+import { cropToWebpBlob } from '../../lib/image'
 
 export function CropModal({
   src,
@@ -10,7 +10,7 @@ export function CropModal({
 }: {
   src: string
   onCancel: () => void
-  onDone: (webpDataUrl: string) => void
+  onDone: (webpBlob: Blob) => void
 }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -21,7 +21,7 @@ export function CropModal({
     if (!area) return
     setBusy(true)
     try {
-      const webp = await cropToWebp(src, area)
+      const webp = await cropToWebpBlob(src, area)
       onDone(webp)
     } finally {
       setBusy(false)

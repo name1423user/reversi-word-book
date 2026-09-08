@@ -26,10 +26,31 @@ export function CardForm({
   const [draft, setDraft, clearDraft] = useDraft<DraftShape>(draftKey, EMPTY)
   const [edit, setEdit] = useState<DraftShape>(EMPTY)
   const frontRef = useRef<HTMLTextAreaElement>(null)
-  const editSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load the selected card into the edit buffer whenever selection changes.
+  // Pending debounced write, keyed by the card id it targets — independent
+  // of whichever card is currently selected, so switching cards can never
+  // clobber a still-pending write for the *previous* one (a real bug this
+  // fixes: editing card A, switching to card B within the 500ms debounce
+  // window, and editing B used to cancel A's unsaved timer outright).
+  const pendingSave = useRef<{ id: string; data: DraftShape } | null>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const flushPendingSave = () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    if (pendingSave.current) {
+      const { id, data } = pendingSave.current
+      pendingSave.current = null
+      db.cards.update(id, { ...data, updatedAt: Date.now() })
+    }
+  }
+
+  // Load the selected card into the edit buffer whenever selection changes,
+  // flushing any not-yet-written edit on the card we're navigating away from.
   useEffect(() => {
+    flushPendingSave()
     if (editingCard) {
       setEdit({
         front: editingCard.front,
@@ -38,17 +59,20 @@ export function CardForm({
         backImage: editingCard.backImage,
       })
     }
-  }, [editingCard])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingCard?.id])
+
+  // Flush on unmount too (e.g. navigating away from the input page).
+  useEffect(() => () => flushPendingSave(), [])
 
   const current = editingCard ? edit : draft
   const setCurrent = (updater: (prev: DraftShape) => DraftShape) => {
     if (editingCard) {
       setEdit((prev) => {
         const next = updater(prev)
-        if (editSaveTimer.current) clearTimeout(editSaveTimer.current)
-        editSaveTimer.current = setTimeout(() => {
-          db.cards.update(editingCard.id, { ...next, updatedAt: Date.now() })
-        }, 500)
+        pendingSave.current = { id: editingCard.id, data: next }
+        if (saveTimer.current) clearTimeout(saveTimer.current)
+        saveTimer.current = setTimeout(flushPendingSave, 500)
         return next
       })
     } else {
@@ -80,10 +104,7 @@ export function CardForm({
   }
 
   const finishEditing = () => {
-    if (editSaveTimer.current) clearTimeout(editSaveTimer.current)
-    if (editingCard) {
-      db.cards.update(editingCard.id, { ...edit, updatedAt: Date.now() })
-    }
+    flushPendingSave()
     onDoneEditing()
   }
 

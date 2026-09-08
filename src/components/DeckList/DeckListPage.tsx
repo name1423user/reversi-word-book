@@ -4,7 +4,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../../db'
 import type { Deck } from '../../types'
 import { computeStreak } from '../../lib/date'
+import { deleteImageRefs } from '../../lib/imageStore'
 import { useConfirm } from '../common/ConfirmProvider'
+import { StorageMeter } from '../common/StorageMeter'
 import { StreakCalendar } from '../Streak/StreakCalendar'
 import { ThemeToggle } from '../common/ThemeToggle'
 
@@ -37,12 +39,14 @@ export function DeckListPage() {
       danger: true,
     })
     if (!ok) return
+    const deckCards = await db.cards.where('deckId').equals(id).toArray()
     await db.transaction('rw', db.decks, db.cards, db.sessions, db.studyDays, async () => {
       await db.decks.delete(id)
       await db.cards.where('deckId').equals(id).delete()
       await db.sessions.where('deckId').equals(id).delete()
       await db.studyDays.where('deckId').equals(id).delete()
     })
+    await deleteImageRefs(deckCards.flatMap((c) => [c.frontImage, c.backImage]))
   }
 
   const commitRename = async (id: string) => {
@@ -53,10 +57,13 @@ export function DeckListPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 flex-1">
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold">📚 単語帳</h1>
         <ThemeToggle />
       </header>
+      <div className="flex justify-end mb-4">
+        <StorageMeter />
+      </div>
 
       <div className="flex gap-2 mb-6">
         <input
