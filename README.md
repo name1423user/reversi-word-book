@@ -27,10 +27,13 @@ npm run build     # 型チェック + 本番ビルド
 npm run preview   # ビルド結果のプレビュー
 npm run lint      # oxlint
 npm test          # vitest（単体テスト）
+npm run test:e2e  # Playwright（E2E。ブラウザ未取得なら npx playwright install chromium）
 node scripts/gen-icons.mjs  # PWAアイコンの再生成
 ```
 
-pushとPull RequestではGitHub Actions（`.github/workflows/ci.yml`）がlint・テスト・型チェック・ビルドを実行します。
+pushとPull RequestではGitHub Actions（`.github/workflows/ci.yml`）がlint・単体テスト・型チェック・ビルドとE2Eを実行します。
+
+独自のChromiumを持つ環境では `PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npm run test:e2e` のように実行パスを指定できます。
 
 ## 実装メモ・仕様上の判断
 
@@ -45,3 +48,5 @@ pushとPull RequestではGitHub Actions（`.github/workflows/ci.yml`）がlint�
 - **苦手優先の出題順**：`history`から算出したスコア（正答率・直近の不正解・迷った時間）の高い順に出題します。未学習のカードは「いつも間違えるカード」より下、「いつも正解するカード」より上に来るようにしています
 - **エクスポートと画像**：構想メモのJSON形式は画像を「URL または WebPデータ」と定めているため、内部の`image:<id>`参照は書き出し時にdata URLへ戻します。「画像込み」モードでは外部URLの画像も可能な範囲でfetchして取り込みますが、CORSで取得できないものはURLのまま残し、その件数を表示します。端末移行には全デッキを1ファイルにまとめるバックアップを使ってください（ZIPも検討しましたが、iPhone/iPadでAirDropやファイルアプリ経由で扱いやすい単一JSONにしています）
 - **同期**：バックエンドは持たず、バックアップJSONの書き出し／読み込みによる手動同期としています。読み込みは常に新しいデッキとして追加するため、既存のデッキを壊しません
+- **データの永続化**：iOS SafariはしばらくアクセスがないサイトのIndexedDBを削除することがあるため、保存データがある状態で永続化されていない場合に警告バナーを出します。ホーム画面に追加したPWAはこの削除の対象外なので、iOSではその案内を優先し、それ以外のブラウザでは`navigator.storage.persist()`を要求するボタンを出します。ページ読み込み時に自動で`persist()`を呼ばないのは、Firefoxで無説明の権限ダイアログが出るのを避けるためです
+- **保存失敗の扱い**：容量オーバー（`QuotaExceededError`）などで書き込みに失敗した場合、黙って失敗せず画面下部に理由と対処（バックアップを取ってから不要なカードを削除する）を表示します。Dexieは元のエラーを`inner`に包むため、判定はそこまで辿って行います

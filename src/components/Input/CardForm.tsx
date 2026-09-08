@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { db, newId } from '../../db'
 import type { Card } from '../../types'
 import { useDraft } from '../../hooks/useDraft'
+import { useToast } from '../common/ToastProvider'
 import { ImageDropZone } from './ImageDropZone'
 
 interface DraftShape {
@@ -22,6 +23,7 @@ export function CardForm({
   editingCard: Card | null
   onDoneEditing: () => void
 }) {
+  const { reportError } = useToast()
   const draftKey = `wordbook:draft:${deckId}`
   const [draft, setDraft, clearDraft] = useDraft<DraftShape>(draftKey, EMPTY)
   const [edit, setEdit] = useState<DraftShape>(EMPTY)
@@ -43,7 +45,11 @@ export function CardForm({
     if (pendingSave.current) {
       const { id, data } = pendingSave.current
       pendingSave.current = null
-      db.cards.update(id, { ...data, updatedAt: Date.now() })
+      // `reportError` is referentially stable, so the unmount-time flush
+      // (captured on first render) still reports through the live provider.
+      db.cards
+        .update(id, { ...data, updatedAt: Date.now() })
+        .catch((e) => reportError(e, '変更の保存'))
     }
   }
 
@@ -62,7 +68,10 @@ export function CardForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingCard?.id])
 
-  // Flush on unmount too (e.g. navigating away from the input page).
+  // Flush on unmount too (e.g. navigating away from the input page). This
+  // deliberately runs only on unmount: `flushPendingSave` reads everything it
+  // needs from refs, so the first render's closure stays correct.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => flushPendingSave(), [])
 
   const current = editingCard ? edit : draft
@@ -97,7 +106,12 @@ export function CardForm({
       createdAt: now,
       updatedAt: now,
     }
-    await db.cards.add(card)
+    try {
+      await db.cards.add(card)
+    } catch (e) {
+      reportError(e, 'カードの登録')
+      return
+    }
     clearDraft()
     setDraft(() => EMPTY)
     frontRef.current?.focus()

@@ -15,7 +15,9 @@ import {
   parseImportJson,
 } from '../../lib/exportImport'
 import { useConfirm } from '../common/ConfirmProvider'
+import { useToast } from '../common/ToastProvider'
 import { StorageMeter } from '../common/StorageMeter'
+import { StorageSafetyBanner } from '../common/StorageSafetyBanner'
 import { StreakCalendar } from '../Streak/StreakCalendar'
 import { ThemeToggle } from '../common/ThemeToggle'
 import { OverviewPanel } from './OverviewPanel'
@@ -50,6 +52,7 @@ export function DeckListPage() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const confirm = useConfirm()
+  const toast = useToast()
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const backupFileRef = useRef<HTMLInputElement>(null)
@@ -84,8 +87,12 @@ export function DeckListPage() {
     // New decks go to the top of the manual order.
     const minOrder = decks?.reduce((min, d) => Math.min(min, d.order), Infinity) ?? 0
     const order = Number.isFinite(minOrder) ? minOrder - 1 : now
-    await db.decks.add({ id: newId(), name, createdAt: now, order })
-    setNewName('')
+    try {
+      await db.decks.add({ id: newId(), name, createdAt: now, order })
+      setNewName('')
+    } catch (e) {
+      toast.reportError(e, 'デッキの作成')
+    }
   }
 
   /** Swap manual order with the neighbouring deck in the given direction. */
@@ -93,10 +100,14 @@ export function DeckListPage() {
     const index = sortedDecks.findIndex((d) => d.id === deck.id)
     const neighbour = sortedDecks[index + direction]
     if (!neighbour) return
-    await db.transaction('rw', db.decks, async () => {
-      await db.decks.update(deck.id, { order: neighbour.order })
-      await db.decks.update(neighbour.id, { order: deck.order })
-    })
+    try {
+      await db.transaction('rw', db.decks, async () => {
+        await db.decks.update(deck.id, { order: neighbour.order })
+        await db.decks.update(neighbour.id, { order: deck.order })
+      })
+    } catch (e) {
+      toast.reportError(e, 'デッキの並び替え')
+    }
   }
 
   const exportOneDeck = async (deck: Deck) => {
@@ -117,19 +128,27 @@ export function DeckListPage() {
       },
     })
     if (!ok) return
-    const deckCards = await db.cards.where('deckId').equals(deck.id).toArray()
-    await db.transaction('rw', db.decks, db.cards, db.sessions, db.studyDays, async () => {
-      await db.decks.delete(deck.id)
-      await db.cards.where('deckId').equals(deck.id).delete()
-      await db.sessions.where('deckId').equals(deck.id).delete()
-      await db.studyDays.where('deckId').equals(deck.id).delete()
-    })
-    await deleteImageRefs(deckCards.flatMap((c) => [c.frontImage, c.backImage]))
+    try {
+      const deckCards = await db.cards.where('deckId').equals(deck.id).toArray()
+      await db.transaction('rw', db.decks, db.cards, db.sessions, db.studyDays, async () => {
+        await db.decks.delete(deck.id)
+        await db.cards.where('deckId').equals(deck.id).delete()
+        await db.sessions.where('deckId').equals(deck.id).delete()
+        await db.studyDays.where('deckId').equals(deck.id).delete()
+      })
+      await deleteImageRefs(deckCards.flatMap((c) => [c.frontImage, c.backImage]))
+    } catch (e) {
+      toast.reportError(e, 'デッキの削除')
+    }
   }
 
   const commitRename = async (id: string) => {
     const name = renameValue.trim()
-    if (name) await db.decks.update(id, { name })
+    try {
+      if (name) await db.decks.update(id, { name })
+    } catch (e) {
+      toast.reportError(e, 'デッキ名の変更')
+    }
     setRenaming(null)
   }
 
@@ -149,6 +168,8 @@ export function DeckListPage() {
         parts.push(`外部URLの画像${report.externalNotFetched}件はリンクのまま`)
       }
       setNotice(parts.join(' / '))
+    } catch (e) {
+      toast.reportError(e, 'バックアップの書き出し')
     } finally {
       setBusy(false)
     }
@@ -196,6 +217,8 @@ export function DeckListPage() {
       const parts = [`${addedDecks}デッキ / ${addedCards}枚を読み込みました`]
       if (warnings.length > 0) parts.push(`画像${warnings.length}件は読み込めませんでした`)
       setNotice(parts.join(' / '))
+    } catch (e) {
+      toast.reportError(e, 'バックアップの読み込み')
     } finally {
       setBusy(false)
     }
@@ -210,6 +233,8 @@ export function DeckListPage() {
       <div className="flex justify-end mb-4">
         <StorageMeter />
       </div>
+
+      <StorageSafetyBanner hasData={(decks?.length ?? 0) > 0} />
 
       <OverviewPanel />
 

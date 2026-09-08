@@ -12,6 +12,7 @@ import {
   type ExportMode,
 } from '../../lib/exportImport'
 import { useConfirm } from '../common/ConfirmProvider'
+import { useToast } from '../common/ToastProvider'
 
 export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: string }) {
   const [text, setText] = useState('')
@@ -23,6 +24,7 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
   const [skipDuplicates, setSkipDuplicates] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
+  const { reportError } = useToast()
 
   const doImport = async (mode: 'append' | 'replace') => {
     setError(null)
@@ -114,6 +116,8 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
       if (warnings.length > 0) {
         setWarning(`${warnings.length}件の画像を読み込めませんでした:\n${warnings.join('\n')}`)
       }
+    } catch (e) {
+      reportError(e, 'カードの一括登録')
     } finally {
       setBusy(false)
     }
@@ -134,6 +138,8 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
         )
       }
       setNotice(parts.join(' / '))
+    } catch (e) {
+      reportError(e, 'カードの書き出し')
     } finally {
       setBusy(false)
     }

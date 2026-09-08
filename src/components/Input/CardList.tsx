@@ -5,6 +5,7 @@ import type { Card, SortKey } from '../../types'
 import { deleteImageRefs, duplicateImageRef } from '../../lib/imageStore'
 import { cardStats, difficultyScore } from '../../lib/difficulty'
 import { useConfirm } from '../common/ConfirmProvider'
+import { useToast } from '../common/ToastProvider'
 import { SmartImage } from '../common/SmartImage'
 
 const SORT_LABEL: Record<SortKey, string> = {
@@ -48,6 +49,7 @@ export function CardList({
   const [selectMode, setSelectMode] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const confirm = useConfirm()
+  const { reportError } = useToast()
 
   const cards = useLiveQuery(
     () => db.cards.where('deckId').equals(deckId).toArray(),
@@ -73,28 +75,36 @@ export function CardList({
       danger: true,
     })
     if (!ok) return
-    await db.cards.delete(card.id)
-    await deleteImageRefs([card.frontImage, card.backImage])
+    try {
+      await db.cards.delete(card.id)
+      await deleteImageRefs([card.frontImage, card.backImage])
+    } catch (e) {
+      reportError(e, 'カードの削除')
+    }
   }
 
   const duplicateCard = async (card: Card) => {
     const now = Date.now()
-    // Copy the blobs too — sharing them would make deleting either card
-    // break the image on the other.
-    const [frontImage, backImage] = await Promise.all([
-      duplicateImageRef(card.frontImage),
-      duplicateImageRef(card.backImage),
-    ])
-    await db.cards.add({
-      ...card,
-      id: newId(),
-      frontImage,
-      backImage,
-      lastResponseTimeMs: 0,
-      history: [],
-      createdAt: now,
-      updatedAt: now,
-    })
+    try {
+      // Copy the blobs too — sharing them would make deleting either card
+      // break the image on the other.
+      const [frontImage, backImage] = await Promise.all([
+        duplicateImageRef(card.frontImage),
+        duplicateImageRef(card.backImage),
+      ])
+      await db.cards.add({
+        ...card,
+        id: newId(),
+        frontImage,
+        backImage,
+        lastResponseTimeMs: 0,
+        history: [],
+        createdAt: now,
+        updatedAt: now,
+      })
+    } catch (e) {
+      reportError(e, 'カードの複製')
+    }
   }
 
   const toggleChecked = (id: string) => {
@@ -121,8 +131,13 @@ export function CardList({
       danger: true,
     })
     if (!ok) return
-    await db.cards.bulkDelete(targets.map((c) => c.id))
-    await deleteImageRefs(targets.flatMap((c) => [c.frontImage, c.backImage]))
+    try {
+      await db.cards.bulkDelete(targets.map((c) => c.id))
+      await deleteImageRefs(targets.flatMap((c) => [c.frontImage, c.backImage]))
+    } catch (e) {
+      reportError(e, 'カードの削除')
+      return
+    }
     exitSelectMode()
   }
 

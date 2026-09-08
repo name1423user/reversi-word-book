@@ -6,6 +6,7 @@ import type { Card, SessionResult, StudyOrder } from '../../types'
 import { shuffled } from '../../lib/shuffle'
 import { byDifficulty } from '../../lib/difficulty'
 import { todayKey } from '../../lib/date'
+import { useToast } from '../common/ToastProvider'
 import { FlashCard } from './FlashCard'
 import { SummaryScreen } from './SummaryScreen'
 import { FirstTimeGuide } from './FirstTimeGuide'
@@ -56,6 +57,7 @@ export function FlashPage() {
     [deckId],
   )
 
+  const { reportError } = useToast()
   const [studyOrder, setStudyOrder] = useState<StudyOrder>(loadStudyOrder)
   const [phase, setPhase] = useState<Phase>('setup')
   const [queue, setQueue] = useState<Card[]>([])
@@ -153,9 +155,13 @@ export function FlashPage() {
         maxStreak,
         isPrimaryRound: true,
       }
-      await db.sessions.add(sr)
-      const date = todayKey()
-      await db.studyDays.put({ id: `${deckId}:${date}`, deckId, date })
+      try {
+        await db.sessions.add(sr)
+        const date = todayKey()
+        await db.studyDays.put({ id: `${deckId}:${date}`, deckId, date })
+      } catch (e) {
+        reportError(e, '学習記録の保存')
+      }
     }
     setPhase('summary')
   }
@@ -171,10 +177,12 @@ export function FlashPage() {
       responseTimeMs,
       prevLastResponseTimeMs,
     })
-    db.cards.update(card.id, {
-      lastResponseTimeMs: responseTimeMs,
-      history: [...card.history, { timestamp: Date.now(), correct, responseTimeMs }],
-    })
+    db.cards
+      .update(card.id, {
+        lastResponseTimeMs: responseTimeMs,
+        history: [...card.history, { timestamp: Date.now(), correct, responseTimeMs }],
+      })
+      .catch((e) => reportError(e, '学習結果の保存'))
     setOverallCompleted((c) => c + 1)
     setCanUndo(true)
 

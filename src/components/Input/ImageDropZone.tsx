@@ -3,6 +3,7 @@ import type { DragEvent } from 'react'
 import { fileFromDrop, fileFromPaste, isHttpUrl } from '../../lib/image'
 import { deleteImageRefs, storeImageBlob } from '../../lib/imageStore'
 import { SmartImage } from '../common/SmartImage'
+import { useToast } from '../common/ToastProvider'
 import { CropModal } from './CropModal'
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
  * are stored as blobs (see lib/imageStore.ts); replacing or removing one
  * cleans up the blob it displaces so nothing is left orphaned. */
 export function ImageDropZone({ label, value, onChange }: Props) {
+  const toast = useToast()
   const [dragOver, setDragOver] = useState(false)
   const [pendingSrc, setPendingSrc] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -38,7 +40,11 @@ export function ImageDropZone({ label, value, onChange }: Props) {
   const replaceValue = async (next: string | null) => {
     const previous = value
     onChange(next)
-    if (previous && previous !== next) await deleteImageRefs([previous])
+    if (previous && previous !== next) {
+      await deleteImageRefs([previous]).catch(() => {
+        /* the card no longer points at it; the startup sweep will collect it */
+      })
+    }
   }
 
   const onDrop = (e: DragEvent) => {
@@ -131,9 +137,14 @@ export function ImageDropZone({ label, value, onChange }: Props) {
           src={pendingSrc}
           onCancel={clearPending}
           onDone={async (blob) => {
-            const ref = await storeImageBlob(blob)
-            clearPending()
-            await replaceValue(ref)
+            try {
+              const ref = await storeImageBlob(blob)
+              clearPending()
+              await replaceValue(ref)
+            } catch (e) {
+              clearPending()
+              toast.reportError(e, '画像の保存')
+            }
           }}
         />
       )}
