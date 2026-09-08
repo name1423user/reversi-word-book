@@ -120,12 +120,21 @@ export function BulkPanel({ deckId, deckName }: { deckId: string; deckName: stri
 
     setBusy(true)
     try {
+      // Pin exactly which cards "replace" is allowed to remove *before*
+      // buildCards runs. buildCards processes images sequentially and can
+      // take real wall-clock time, during which the ordinary add-card form
+      // on the same page stays fully usable. Deleting by this fixed id list
+      // — instead of re-querying `deckId` when the transaction finally runs
+      // — means a card added while the import was still processing can
+      // never be swept up by it.
+      const existing =
+        mode === 'replace' ? await db.cards.where('deckId').equals(deckId).toArray() : []
       const { cards: newCards, warnings } = await buildCards(deckId, incoming)
 
       if (mode === 'replace') {
-        const existing = await db.cards.where('deckId').equals(deckId).toArray()
+        const existingIds = existing.map((c) => c.id)
         await db.transaction('rw', db.cards, async () => {
-          await db.cards.where('deckId').equals(deckId).delete()
+          await db.cards.bulkDelete(existingIds)
           await db.cards.bulkAdd(newCards)
         })
         await deleteImageRefs(existing.flatMap((c) => [c.frontImage, c.backImage]))
