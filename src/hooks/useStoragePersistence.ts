@@ -18,6 +18,10 @@ function detectInstalled(): boolean {
   return iosStandalone || window.matchMedia?.('(display-mode: standalone)').matches === true
 }
 
+function isPersistenceSupported(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.storage?.persisted
+}
+
 /**
  * Tracks whether the browser will keep our IndexedDB data.
  *
@@ -31,16 +35,14 @@ function detectInstalled(): boolean {
  * a banner the user can act on.
  */
 export function useStoragePersistence(): StoragePersistence {
-  const [status, setStatus] = useState<PersistenceStatus>('checking')
-  const [isInstalled, setIsInstalled] = useState(false)
+  const [status, setStatus] = useState<PersistenceStatus>(() =>
+    isPersistenceSupported() ? 'checking' : 'unsupported',
+  )
+  const [isInstalled] = useState(detectInstalled)
 
   useEffect(() => {
-    setIsInstalled(detectInstalled())
+    if (!isPersistenceSupported()) return
     let cancelled = false
-    if (typeof navigator === 'undefined' || !navigator.storage?.persisted) {
-      setStatus('unsupported')
-      return
-    }
     navigator.storage
       .persisted()
       .then((persisted) => {

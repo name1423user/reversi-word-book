@@ -1,26 +1,6 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-
-interface ConfirmOptions {
-  title: string
-  message?: string
-  confirmLabel?: string
-  cancelLabel?: string
-  danger?: boolean
-  /** Optional third button that runs without closing the dialog — used for
-   * safety nets like "export this deck before deleting it". */
-  extraAction?: { label: string; run: () => void | Promise<void> }
-}
-
-type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
-
-const ConfirmContext = createContext<ConfirmFn | null>(null)
-
-export function useConfirm(): ConfirmFn {
-  const ctx = useContext(ConfirmContext)
-  if (!ctx) throw new Error('useConfirm must be used within ConfirmProvider')
-  return ctx
-}
+import { ConfirmContext, type ConfirmFn, type ConfirmOptions } from './ConfirmContext'
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null)

@@ -1,6 +1,6 @@
 import type { SessionResult } from '../../types'
 import { formatDuration, formatSessionWhen } from '../../lib/date'
-import { useConfirm } from '../common/ConfirmProvider'
+import { useConfirm } from '../common/ConfirmContext'
 import { SmartImage } from '../common/SmartImage'
 import type { RoundResult } from './flashTypes'
 

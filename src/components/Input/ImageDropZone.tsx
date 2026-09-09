@@ -3,7 +3,7 @@ import type { DragEvent } from 'react'
 import { fileFromDrop, fileFromPaste, isHttpUrl } from '../../lib/image'
 import { deleteImageRefs, storeImageBlob } from '../../lib/imageStore'
 import { SmartImage } from '../common/SmartImage'
-import { useToast } from '../common/ToastProvider'
+import { useToast } from '../common/ToastContext'
 import { CropModal } from './CropModal'
 
 interface Props {

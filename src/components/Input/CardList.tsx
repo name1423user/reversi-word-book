@@ -4,8 +4,8 @@ import { db, newId } from '../../db'
 import type { Card, SortKey } from '../../types'
 import { deleteImageRefs, duplicateImageRef } from '../../lib/imageStore'
 import { cardStats, difficultyScore } from '../../lib/difficulty'
-import { useConfirm } from '../common/ConfirmProvider'
-import { useToast } from '../common/ToastProvider'
+import { useConfirm } from '../common/ConfirmContext'
+import { useToast } from '../common/ToastContext'
 import { SmartImage } from '../common/SmartImage'
 
 const SORT_LABEL: Record<SortKey, string> = {

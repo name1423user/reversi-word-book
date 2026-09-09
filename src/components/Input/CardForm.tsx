@@ -3,7 +3,7 @@ import { db, newId } from '../../db'
 import type { Card } from '../../types'
 import { useDraft } from '../../hooks/useDraft'
 import { draftKeyFor } from '../../lib/draft'
-import { useToast } from '../common/ToastProvider'
+import { useToast } from '../common/ToastContext'
 import { ImageDropZone } from './ImageDropZone'
 
 interface DraftShape {

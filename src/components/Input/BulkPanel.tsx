@@ -17,8 +17,8 @@ import {
   buildAiPrompt,
   type CardStyle,
 } from '../../lib/aiPrompt'
-import { useConfirm } from '../common/ConfirmProvider'
-import { useToast } from '../common/ToastProvider'
+import { useConfirm } from '../common/ConfirmContext'
+import { useToast } from '../common/ToastContext'
 
 export function BulkPanel({
   deckId,

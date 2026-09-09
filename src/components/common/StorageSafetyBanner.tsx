@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStoragePersistence } from '../../hooks/useStoragePersistence'
-import { useToast } from './ToastProvider'
+import { useToast } from './ToastContext'
 
 const DISMISS_KEY = 'wordbook:dismissedStorageWarning'
 

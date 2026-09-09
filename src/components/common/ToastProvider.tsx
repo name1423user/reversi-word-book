@@ -1,28 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { storageErrorMessage } from '../../lib/storageError'
-
-type Tone = 'info' | 'error'
-
-interface Toast {
-  id: number
-  message: string
-  tone: Tone
-}
-
-interface ToastApi {
-  show: (message: string, tone?: Tone) => void
-  /** Report a failed write with a message the user can act on. */
-  reportError: (error: unknown, action: string) => void
-}
-
-const ToastContext = createContext<ToastApi | null>(null)
-
-export function useToast(): ToastApi {
-  const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
-}
+import { ToastContext, type Toast, type Tone } from './ToastContext'
 
 const AUTO_DISMISS_MS = { info: 3500, error: 9000 }
 

@@ -14,8 +14,8 @@ import {
   formatBytes,
   parseImportJson,
 } from '../../lib/exportImport'
-import { useConfirm } from '../common/ConfirmProvider'
-import { useToast } from '../common/ToastProvider'
+import { useConfirm } from '../common/ConfirmContext'
+import { useToast } from '../common/ToastContext'
 import { StorageMeter } from '../common/StorageMeter'
 import { StorageSafetyBanner } from '../common/StorageSafetyBanner'
 import { StreakCalendar } from '../Streak/StreakCalendar'

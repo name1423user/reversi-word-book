@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useImageSrc } from '../../hooks/useImageSrc'
 
 /** Renders an image (external URL or an `image:` blob reference), falling
@@ -14,11 +14,15 @@ export function SmartImage({
   className?: string
 }) {
   const resolved = useImageSrc(src ?? null)
+  const [prevSrc, setPrevSrc] = useState(src)
   const [imgError, setImgError] = useState(false)
 
-  useEffect(() => {
+  // Clear a stale error when the source changes, without waiting a tick for
+  // an effect — see https://react.dev/learn/you-might-not-need-an-effect
+  if (src !== prevSrc) {
+    setPrevSrc(src)
     setImgError(false)
-  }, [src])
+  }
 
   if (!src) return null
 
