@@ -29,6 +29,19 @@ export function computeStreak(studyDates: string[]): number {
   return streak
 }
 
+/** Human-friendly "when" label for a past session's timestamp, e.g. next to
+ * "直近セッション比" — a bare percentage with no date reads as "just now"
+ * even when the comparison is from days ago. */
+export function formatSessionWhen(ms: number, now = Date.now()): string {
+  const d = new Date(ms)
+  const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+  const dayKey = todayKey(d)
+  const nowKey = todayKey(new Date(now))
+  if (dayKey === nowKey) return `今日 ${time}`
+  if (dayKey === addDays(nowKey, -1)) return `昨日 ${time}`
+  return `${d.getMonth() + 1}/${d.getDate()} ${time}`
+}
+
 export function formatDuration(ms: number): string {
   const totalSec = Math.round(ms / 1000)
   const min = Math.floor(totalSec / 60)

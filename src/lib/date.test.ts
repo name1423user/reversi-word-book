@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
-import { addDays, computeStreak, formatDuration, todayKey } from './date'
+import { addDays, computeStreak, formatDuration, formatSessionWhen, todayKey } from './date'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -69,5 +69,25 @@ describe('formatDuration', () => {
 
   it('shows minutes and seconds above a minute', () => {
     expect(formatDuration(95_000)).toBe('1分35秒')
+  })
+})
+
+describe('formatSessionWhen', () => {
+  it('labels a timestamp from today as "今日"', () => {
+    const now = new Date(2026, 2, 10, 18, 0).getTime()
+    const ts = new Date(2026, 2, 10, 9, 5).getTime()
+    expect(formatSessionWhen(ts, now)).toBe('今日 9:05')
+  })
+
+  it('labels a timestamp from yesterday as "昨日"', () => {
+    const now = new Date(2026, 2, 10, 8, 0).getTime()
+    const ts = new Date(2026, 2, 9, 23, 45).getTime()
+    expect(formatSessionWhen(ts, now)).toBe('昨日 23:45')
+  })
+
+  it('falls back to a month/day label further back', () => {
+    const now = new Date(2026, 2, 10, 8, 0).getTime()
+    const ts = new Date(2026, 2, 1, 14, 30).getTime()
+    expect(formatSessionWhen(ts, now)).toBe('3/1 14:30')
   })
 })

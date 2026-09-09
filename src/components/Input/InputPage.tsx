@@ -11,6 +11,10 @@ export function InputPage() {
   const { deckId } = useParams<{ deckId: string }>()
   const deck = useLiveQuery(() => (deckId ? db.decks.get(deckId) : undefined), [deckId])
   const [editingCard, setEditingCard] = useState<Card | null>(null)
+  // Mirrors BulkPanel's own busy state up here so the ordinary add-card form
+  // — a completely separate component — can visibly hold off while a JSON
+  // import/replace is processing, instead of quietly working alongside it.
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   if (!deckId) return null
 
@@ -30,14 +34,26 @@ export function InputPage() {
         </Link>
       </header>
 
+      {bulkBusy && (
+        <div
+          className="rounded-xl px-4 py-2.5 mb-5 text-sm flex items-center gap-2"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+          role="status"
+        >
+          <span aria-hidden>⏳</span>
+          一括登録を処理中です。完了までこのデッキへの追加登録は少しお待ちください。
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <div className="flex flex-col gap-4 lg:sticky lg:top-6">
           <CardForm
             deckId={deckId}
             editingCard={editingCard}
             onDoneEditing={() => setEditingCard(null)}
+            bulkBusy={bulkBusy}
           />
-          <BulkPanel deckId={deckId} deckName={deck?.name ?? ''} />
+          <BulkPanel deckId={deckId} deckName={deck?.name ?? ''} onBusyChange={setBulkBusy} />
         </div>
         <CardList
           deckId={deckId}

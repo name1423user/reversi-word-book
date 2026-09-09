@@ -19,10 +19,16 @@ export function CardForm({
   deckId,
   editingCard,
   onDoneEditing,
+  bulkBusy = false,
 }: {
   deckId: string
   editingCard: Card | null
   onDoneEditing: () => void
+  /** True while the JSON一括登録パネルが処理中. A "replace" import decides
+   * exactly which cards it will delete before it starts, so this card would
+   * not physically vanish the way it used to — but submitting into a deck
+   * that's mid-replace is still confusing, so the button is held instead. */
+  bulkBusy?: boolean
 }) {
   const { reportError } = useToast()
   const draftKey = draftKeyFor(deckId)
@@ -98,7 +104,7 @@ export function CardForm({
   const isEmpty = (d: DraftShape) => !d.front.trim() && !d.frontImage && !d.back.trim() && !d.backImage
 
   const submitNew = async () => {
-    if (isEmpty(draft) || submitting.current) return
+    if (isEmpty(draft) || submitting.current || bulkBusy) return
     submitting.current = true
     setIsSubmitting(true)
     const now = Date.now()
@@ -194,16 +200,17 @@ export function CardForm({
       </div>
 
       {!editingCard && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={submitNew}
-            disabled={isEmpty(draft) || isSubmitting}
+            disabled={isEmpty(draft) || isSubmitting || bulkBusy}
             className="q-btn q-btn-primary"
+            title={bulkBusy ? '一括登録の処理が終わるまでお待ちください' : undefined}
           >
             このカードを登録（Enter）
           </button>
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            下書きは自動保存されます
+            {bulkBusy ? '一括登録の処理中はここからの登録は少しお待ちください' : '下書きは自動保存されます'}
           </span>
         </div>
       )}

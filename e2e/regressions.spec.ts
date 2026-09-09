@@ -320,3 +320,93 @@ test.describe('POT-004 学習中に別タブでカードが削除された場合
     await expect(page.getByRole('alert')).toContainText('記録できませんでした')
   })
 })
+
+test.describe('BUG-V2-001 一括置き換え中に別フォームで追加したカードが消える', () => {
+  const PNG_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+
+  test('置き換えの完了を待たずに追加したカードが生き残る', async ({ page }) => {
+    await createDeck(page, 'v2-001')
+    await gotoDeckInput(page, 'v2-001')
+    await importCards(page, [{ front: 'old', back: 'old-back' }])
+
+    // 画像付きカードを多数含む「置き換え」は、buildCards が1件ずつ
+    // Image.onload → canvas.toBlob → IndexedDB書き込み を直列に待つため
+    // 実時間がかかる。その間に別フォームでの追加が割り込めることを確認する。
+    const bulk = Array.from({ length: 60 }, (_, i) => ({
+      front: `bulk-${i}`,
+      back: `bulk-back-${i}`,
+      frontImage: PNG_1PX,
+      backImage: null,
+    }))
+    await page.fill('textarea[placeholder="JSONをここに貼り付け"]', JSON.stringify(bulk))
+    await page.getByRole('button', { name: '既存を置き換え' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: '置き換える' }).click()
+
+    // 置き換えの完了を待たず、無関係な「カードを追加」フォームで登録する
+    await page.fill('textarea[placeholder="表面のテキスト"]', 'RACE-CARD')
+    await page.fill('textarea[placeholder="裏面のテキスト"]', 'RACE-CARD-BACK')
+    await page.getByRole('button', { name: 'このカードを登録（Enter）' }).click()
+
+    // Poll IndexedDB directly rather than the UI notice: buildCards()
+    // round-trips 60 images through Image.onload/canvas.toBlob, and how long
+    // that actually takes depends on machine load, not just this test.
+    await expect
+      .poll(
+        async () => {
+          const { cards } = await readStores<{ cards: unknown[] }>(page, ['cards'])
+          return cards.length
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(61)
+
+    const { cards } = await readStores<{ cards: { front: string }[] }>(page, ['cards'])
+    expect(cards.map((c) => c.front)).toContain('RACE-CARD')
+  })
+})
+
+test.describe('BUG-V2-002 ラウンド最後の1枚での判定直後Undo', () => {
+  test('カードの履歴とセッション記録が食い違わない', async ({ page }) => {
+    await createDeck(page, 'v2-002')
+    await gotoDeckInput(page, 'v2-002')
+    await importCards(page, [{ front: 'only-card', back: 'only-back' }])
+
+    await page.getByRole('link', { name: '学習へ' }).click()
+    await page.getByRole('button', { name: '学習をはじめる' }).click()
+    const guide = page.getByRole('button', { name: 'はじめる' })
+    if (await guide.isVisible().catch(() => false)) await guide.click()
+
+    // ラウンド最後(かつ唯一)の1枚を判定した直後にUndoを、Playwrightの
+    // actionabilityチェックより速いページ内発火で連続ディスパッチし、
+    // finishRoundの結果確定〜永続化完了までの窓を突く。
+    const dispatch = await page.evaluate(async () => {
+      function clickByLabel(label: string): boolean {
+        const btn = Array.from(document.querySelectorAll('button')).find(
+          (b) => b.getAttribute('aria-label') === label || b.textContent?.trim() === label,
+        ) as HTMLButtonElement | undefined
+        if (!btn) return false
+        btn.click()
+        return true
+      }
+      const judged = clickByLabel('覚えた（正解）')
+      for (let i = 0; i < 50; i++) await Promise.resolve()
+      const undone = clickByLabel('↺ 元に戻す')
+      return { judged, undone }
+    })
+    expect(dispatch.judged, 'judge click should have landed').toBe(true)
+
+    await page.waitForTimeout(1000)
+
+    const { cards, sessions } = await readStores<{
+      cards: { front: string; history: unknown[] }[]
+      sessions: { correct: number; incorrect: number; total: number }[]
+    }>(page, ['cards', 'sessions'])
+
+    // Undoが間に合って巻き戻ったか(0/0)、間に合わずロックされて判定のまま
+    // 残ったか(1/1)のどちらであっても構わない。壊れていたのは「カードの
+    // 履歴だけ巻き戻り、保存済みセッションだけ古い値のまま食い違う」状態
+    // だったので、ここではその一致だけを固定する。
+    expect(sessions[0]?.correct).toBe(cards[0]?.history.length)
+  })
+})

@@ -70,6 +70,15 @@ export function FlashPage() {
   const [frozenBaseline, setFrozenBaseline] = useState<SessionResult | null>(null)
   const [showGuide, setShowGuide] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
+  // True while finishRound's DB writes (db.sessions.add / db.studyDays.put)
+  // for the round's *last* judgment are still in flight. finishRound reads
+  // roundJudgmentsRef synchronously (before its first await) to build the
+  // SessionResult it persists, so an Undo landing after that read can no
+  // longer change what gets saved — it would only roll back card.history,
+  // leaving the saved session (and the "直近セッション比" baseline it
+  // feeds) permanently out of sync with the card. Locking Undo for this
+  // window closes that gap.
+  const [isFinishing, setIsFinishing] = useState(false)
 
   const roundJudgmentsRef = useRef<RoundJudgment[]>([])
   const roundStartedAtRef = useRef(0)
@@ -200,11 +209,13 @@ export function FlashPage() {
       setIsFlipped(false)
       cardShownAtRef.current = Date.now()
     } else {
-      finishRound(roundJudgmentsRef.current, queue)
+      setIsFinishing(true)
+      finishRound(roundJudgmentsRef.current, queue).finally(() => setIsFinishing(false))
     }
   }
 
   const handleUndo = async () => {
+    if (isFinishing) return
     const judgments = roundJudgmentsRef.current
     if (judgments.length === 0) return
     const last = judgments.pop()!
@@ -448,8 +459,13 @@ export function FlashPage() {
 
           <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
             <span>通算 {Math.min(overallCompleted + 1, overallTotal)}/{overallTotal}</span>
-            <button onClick={handleUndo} disabled={!canUndo} className="q-btn q-btn-ghost q-btn-sm">
-              ↺ 元に戻す
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo || isFinishing}
+              className="q-btn q-btn-ghost q-btn-sm"
+              title={isFinishing ? '記録を保存しています…' : undefined}
+            >
+              {isFinishing ? '記録中…' : '↺ 元に戻す'}
             </button>
           </div>
         </div>
